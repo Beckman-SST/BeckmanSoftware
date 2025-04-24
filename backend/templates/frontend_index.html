@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RePosture</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">RePosture</h1>
+        
+        <!-- Navegação -->
+        <div class="d-flex justify-content-end mb-3">
+            <a href="#" class="btn btn-outline-primary me-2" id="btn-logs"><i class="bi bi-journal-text"></i> Gerenciar Logs</a>
+            <a href="#" class="btn btn-outline-primary" id="btn-config"><i class="bi bi-gear"></i> Configurações</a>
+        </div>
+        
+        <!-- Mensagens Flash -->
+        <div id="flash-messages"></div>
+        
+        <!-- Card de Upload -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Upload de Imagens e Vídeos</h5>
+            </div>
+            <div class="card-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="files" class="form-label">Selecione imagens ou vídeos para processamento</label>
+                        <input class="form-control" type="file" id="files" name="files" multiple accept=".jpg,.jpeg,.png,.mp4,.avi" onchange="previewFiles()" data-browse="Escolher Arquivos">
+                        <div class="form-text">Formatos suportados: JPG, JPEG, PNG, MP4, AVI</div>
+                    </div>
+                    
+                    <!-- Área de pré-visualização das imagens selecionadas -->
+                    <div id="preview-container" class="mb-3" style="display: none;">
+                        <h6>Arquivos selecionados:</h6>
+                        <div id="file-preview" class="gallery"></div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary" id="btn-upload">Enviar para Processamento</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Status do Processamento -->
+        <div id="status-container" class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Status do Processamento</h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p id="status-message" class="text-center">Processando arquivos...</p>
+                <p id="progress-info" class="text-center">Arquivo <span id="current-file">0</span> de <span id="total-files">0</span></p>
+                <p id="time-remaining" class="text-center">Tempo restante estimado: <span id="remaining-time">calculando...</span></p>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <button type="button" id="btn-cancelar" class="btn btn-danger">Cancelar Processamento</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resultados do Processamento -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Arquivos Processados</h5>
+                <div>
+                    <button id="btn-abrir-pasta" class="btn btn-sm btn-outline-light me-2">Abrir Pasta Output</button>
+                    <button id="btn-limpar" class="btn btn-sm btn-outline-light">Limpar Temporários</button>
+                </div>
+            </div>
+            <div class="card-body" id="processed-files-container">
+                <p class="text-center">Nenhum arquivo processado ainda.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para exibir imagens ampliadas -->
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel">Visualização da Imagem</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" src="" alt="Imagem ampliada" class="img-fluid">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

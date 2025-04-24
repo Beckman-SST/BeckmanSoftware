@@ -1,0 +1,13 @@
+2025-04-24 14:42:42,413 - INFO - Pasta 'Output' já existe. As imagens serão salvas nela.
+2025-04-24 14:42:42,413 - INFO - Iniciando processamento do arquivo: uploads\adriany_sentada2.jpg
+2025-04-24 14:42:42,451 - INFO - Arquivo detectado como imagem
+2025-04-24 14:42:42,691 - INFO - Frame 0: Tipo de análise: parte superior do corpo
+2025-04-24 14:42:42,691 - INFO - Frame 0: Iniciando detecção de dispositivos eletrônicos
+2025-04-24 14:42:44,156 - INFO - Frame 0: 1 dispositivo(s) eletrônico(s) detectado(s)
+2025-04-24 14:42:44,157 - INFO - Frame 0: Lado esquerdo mais visível. Processando lado esquerdo.
+2025-04-24 14:42:44,175 - INFO - Frame 0: Dispositivo eletrônico detectado, calculando ângulo dos olhos
+2025-04-24 14:42:44,175 - INFO - Frame 0: Ângulo dos olhos calculado: 51.57 graus
+2025-04-24 14:42:44,175 - INFO - Frame 0: Ângulo do cotovelo left: 92.55 graus
+2025-04-24 14:42:44,175 - INFO - Frame 0: Ângulo do pulso left: 164.73 graus
+2025-04-24 14:42:44,184 - INFO - Frame 0: Imagem processada salva em: Output\processed_adriany_sentada2.jpg_0.jpg
+2025-04-24 14:42:44,184 - INFO - Processamento finalizado

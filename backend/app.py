@@ -66,8 +66,8 @@ def save_config_to_file(config):
 
 # Verifica se as pastas necessárias existem
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+    folder_path = os.path.join(os.path.dirname(__file__), folder)
+    os.makedirs(folder_path, exist_ok=True)
 
 # Função para verificar se a extensão do arquivo é permitida
 def allowed_file(filename):

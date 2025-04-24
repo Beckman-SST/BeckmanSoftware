@@ -1,0 +1,13 @@
+2025-04-24 14:41:51,912 - INFO - Pasta 'Output' já existe. As imagens serão salvas nela.
+2025-04-24 14:41:51,912 - INFO - Iniciando processamento do arquivo: uploads\funcionario6.jpg
+2025-04-24 14:41:51,945 - INFO - Arquivo detectado como imagem
+2025-04-24 14:41:52,215 - INFO - Frame 0: Tipo de análise: parte superior do corpo
+2025-04-24 14:41:52,216 - INFO - Frame 0: Iniciando detecção de dispositivos eletrônicos
+2025-04-24 14:41:53,457 - INFO - Frame 0: 1 dispositivo(s) eletrônico(s) detectado(s)
+2025-04-24 14:41:53,458 - INFO - Frame 0: Lado esquerdo mais visível. Processando lado esquerdo.
+2025-04-24 14:41:53,477 - INFO - Frame 0: Dispositivo eletrônico detectado, calculando ângulo dos olhos
+2025-04-24 14:41:53,477 - INFO - Frame 0: Ângulo dos olhos calculado: 53.84 graus
+2025-04-24 14:41:53,477 - INFO - Frame 0: Ângulo do cotovelo left: 111.37 graus
+2025-04-24 14:41:53,477 - INFO - Frame 0: Ângulo do pulso left: 147.98 graus
+2025-04-24 14:41:53,486 - INFO - Frame 0: Imagem processada salva em: Output\processed_funcionario6.jpg_0.jpg
+2025-04-24 14:41:53,486 - INFO - Processamento finalizado

@@ -4,7 +4,7 @@
     "yolo_confidence": 0.65,
     "moving_average_window": 5,
     "show_face_blur": true,
-    "show_electronics": false,
+    "show_electronics": true,
     "show_angles": true,
     "show_upper_body": true,
     "show_lower_body": true,

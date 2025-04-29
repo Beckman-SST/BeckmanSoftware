@@ -12,6 +12,8 @@ import datetime
 from ultralytics import YOLO
 from multiprocessing import Pool
 
+# Configuração para processamento de vistas lateral e inferior
+
 # Configuração do sistema de logs
 log_folder = "logs"
 if not os.path.exists(log_folder):
@@ -46,7 +48,7 @@ mpDraw = mp.solutions.drawing_utils
 mpHolistic = mp.solutions.holistic
 
 # Carregar modelo YOLOv8 pré-treinado
-yolo_model = YOLO('yolov8n.pt')  # Modelo nano padrão - substitua por um modelo personalizado se necessário
+yolo_model = YOLO('yolov8n.pt')  # Modelo nano padrão
 
 # Classes de interesse para notebooks e monitores (IDs do dataset COCO)
 CLASSES_OF_INTEREST = [63, 62]  # 63 = laptop, 62 = tv/monitor
@@ -121,6 +123,8 @@ holistic = mpHolistic.Holistic(
     min_tracking_confidence=MIN_TRACKING_CONFIDENCE,
     model_complexity=2 
 )
+
+# Configuração para processamento de vistas lateral e inferior
 
 # Buffer para média móvel dos landmarks
 landmark_buffer = []
@@ -295,7 +299,51 @@ def should_process_lower_body(landmarks):
     foot_visibility = max(right_foot_visibility, left_foot_visibility)
     
     # Retorna True apenas se todos os pontos necessários estiverem visíveis
-    return all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility]) 
+    return all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility])
+
+# Função para detectar o tipo de vista (lateral ou inferior)
+def detectar_tipo_vista(frame, landmarks):
+    if landmarks is None or len(landmarks) == 0:
+        # Se não há landmarks detectados, assumir vista lateral como padrão
+        logger.info("Nenhum landmark detectado pelo MediaPipe, assumindo vista lateral")
+        return "lateral"
+    
+    try:
+        # Verificar visibilidade dos pontos-chave
+        right_shoulder = landmarks[mpHolistic.PoseLandmark.RIGHT_SHOULDER.value]
+        left_shoulder = landmarks[mpHolistic.PoseLandmark.LEFT_SHOULDER.value]
+        right_hip = landmarks[mpHolistic.PoseLandmark.RIGHT_HIP.value]
+        left_hip = landmarks[mpHolistic.PoseLandmark.LEFT_HIP.value]
+        right_ankle = landmarks[mpHolistic.PoseLandmark.RIGHT_ANKLE.value]
+        left_ankle = landmarks[mpHolistic.PoseLandmark.LEFT_ANKLE.value]
+        right_knee = landmarks[mpHolistic.PoseLandmark.RIGHT_KNEE.value]
+        left_knee = landmarks[mpHolistic.PoseLandmark.LEFT_KNEE.value]
+        
+        # Calcular visibilidade média dos pontos-chave para cada tipo de vista
+        visibilidade_lateral = (right_shoulder.visibility + left_shoulder.visibility + 
+                               right_hip.visibility + left_hip.visibility) / 4
+        
+        visibilidade_inferior = (right_ankle.visibility + left_ankle.visibility + 
+                               right_knee.visibility + left_knee.visibility) / 4
+        
+        # Verificar a diferença horizontal entre os ombros (para vista lateral)
+        diferenca_ombros = abs(right_shoulder.x - left_shoulder.x)
+        
+        logger.debug(f"Visibilidade lateral: {visibilidade_lateral:.2f}")
+        logger.debug(f"Visibilidade inferior: {visibilidade_inferior:.2f}")
+        logger.debug(f"Diferença horizontal ombros: {diferenca_ombros:.2f}")
+        
+        # Critérios para determinar o tipo de vista
+        if visibilidade_inferior > 0.7 and visibilidade_inferior > visibilidade_lateral:
+            return "inferior"
+        else:
+            # Caso padrão, assumir vista lateral
+            return "lateral"
+    
+    except Exception as e:
+        logger.error(f"Erro ao detectar tipo de vista: {str(e)}")
+        # Em caso de erro, assumir vista lateral (comportamento padrão)
+        return "lateral"
 
 # Função para ajustar posição do texto para evitar sobreposição
 def adjust_text_position(frame, text, position, bbox=None):
@@ -334,6 +382,8 @@ logger.info(f"Iniciando processamento do arquivo: {input_path}")
 image = cv.imread(input_path)
 is_image = image is not None
 
+# Função removida: carregamento do modelo AlphaPose
+
 if is_image:
     logger.info(f"Arquivo detectado como imagem")
     frames = [image]
@@ -365,7 +415,10 @@ for frame_idx, frame in enumerate(frames):
     imgRGB = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
     results = holistic.process(imgRGB)
     
-    # Validação e suavização dos landmarks
+    # Inicializa variáveis para processamento
+    tipo_vista = "lateral"
+    
+    # Validação e suavização dos landmarks do MediaPipe
     if results.pose_landmarks:
         current_landmarks = [(lm.x, lm.y, lm.z, lm.visibility) for lm in results.pose_landmarks.landmark]
         
@@ -389,6 +442,12 @@ for frame_idx, frame in enumerate(frames):
                 results.pose_landmarks.landmark[i].y = y_avg
                 results.pose_landmarks.landmark[i].z = z_avg
                 results.pose_landmarks.landmark[i].visibility = vis_avg
+        
+        # Detecta o tipo de vista (lateral ou inferior)
+        tipo_vista = detectar_tipo_vista(frame, results.pose_landmarks.landmark)
+    else:
+        # Se o MediaPipe não detectou landmarks, assume vista lateral
+        tipo_vista = "lateral"
     
     # Inicializa as variáveis
     landmarks = None
@@ -420,9 +479,13 @@ for frame_idx, frame in enumerate(frames):
                 wrist_position = (int(landmarks[mpHolistic.PoseLandmark.LEFT_WRIST.value].x * frame.shape[1]),
                                 int(landmarks[mpHolistic.PoseLandmark.LEFT_WRIST.value].y * frame.shape[0]))
     
-    # Verificar se é análise da parte inferior do corpo
-    is_lower_body = should_process_lower_body(results.pose_landmarks.landmark) if results.pose_landmarks else False
-    logger.info(f"Frame {frame_idx}: Tipo de análise: {'parte inferior do corpo' if is_lower_body else 'parte superior do corpo'}")
+    # Verificar o tipo de análise (parte inferior ou superior)
+    is_lower_body = False
+    if results.pose_landmarks:
+        is_lower_body = should_process_lower_body(results.pose_landmarks.landmark)
+    
+    # Log do tipo de análise
+    logger.info(f"Frame {frame_idx}: Tipo de análise: {'parte inferior do corpo' if is_lower_body else 'parte superior do corpo'} - Vista: {tipo_vista}")
 
     # Detectar objetos eletrônicos apenas se não for análise da parte inferior
     logger.info(f"Frame {frame_idx}: Iniciando detecção de dispositivos eletrônicos")
@@ -496,10 +559,38 @@ for frame_idx, frame in enumerate(frames):
 
     try:
         landmarks = results.pose_landmarks.landmark
+        
+        # Desenha os ângulos calculados no frame
+        if angulos:
+            h, w = frame.shape[:2]
+            for nome_angulo, valor in angulos.items():
+                # Define a posição do texto com base no tipo de ângulo
+                if 'cotovelo_direito' in nome_angulo:
+                    posicao = (int(w * 0.75), int(h * 0.3))
+                elif 'cotovelo_esquerdo' in nome_angulo:
+                    posicao = (int(w * 0.25), int(h * 0.3))
+                elif 'pulso_direito' in nome_angulo:
+                    posicao = (int(w * 0.75), int(h * 0.4))
+                elif 'pulso_esquerdo' in nome_angulo:
+                    posicao = (int(w * 0.25), int(h * 0.4))
+                else:
+                    posicao = (int(w * 0.5), int(h * 0.5))
+                
+                # Formata o texto do ângulo
+                texto = f"{nome_angulo.replace('_', ' ').title()}: {valor:.1f}°"
+                
+                # Desenha o texto com fundo para melhor visibilidade
+                (text_width, text_height), _ = cv.getTextSize(texto, cv.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+                cv.rectangle(frame_clean, 
+                           (posicao[0] - 5, posicao[1] - text_height - 5), 
+                           (posicao[0] + text_width + 5, posicao[1] + 5), 
+                           (0, 0, 0), -1)
+                cv.putText(frame_clean, texto, posicao, cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv.LINE_AA)
     except:
         landmarks = None
-
-    if landmarks and deve_continuar:
+    
+    # Processa os ângulos com MediaPipe para vistas lateral e inferior
+    if landmarks is not None and deve_continuar:
         process_lower = should_process_lower_body(landmarks)
         
         if process_lower:
@@ -508,7 +599,6 @@ for frame_idx, frame in enumerate(frames):
                 mpHolistic.PoseLandmark.RIGHT_HIP.value,
                 mpHolistic.PoseLandmark.RIGHT_KNEE.value,
                 mpHolistic.PoseLandmark.RIGHT_ANKLE.value,
-                mpHolistic.PoseLandmark.RIGHT_FOOT_INDEX.value
             ]
             
             left_leg_indices = [

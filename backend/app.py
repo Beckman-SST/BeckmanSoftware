@@ -14,8 +14,8 @@ from werkzeug.utils import secure_filename
 # Configurações da aplicação
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'beckman_project_secret_key'
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['OUTPUT_FOLDER'] = 'Output'
+app.config['UPLOAD_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
+app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Output'))
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max
 app.config['ALLOWED_EXTENSIONS'] = {'jpg', 'jpeg', 'png', 'mp4', 'avi'}
 app.config['CONFIG_FILE'] = 'config.json'
@@ -66,8 +66,12 @@ def save_config_to_file(config):
 
 # Verifica se as pastas necessárias existem
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
-    folder_path = os.path.join(os.path.dirname(__file__), folder)
-    os.makedirs(folder_path, exist_ok=True)
+    try:
+        os.makedirs(folder, exist_ok=True)
+        if not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
+    except Exception as e:
+        print(f"Erro ao criar/verificar pasta {folder}: {e}")
 
 # Função para verificar se a extensão do arquivo é permitida
 def allowed_file(filename):
@@ -262,8 +266,12 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-            valid_files.append(file_path)
+            try:
+                file.save(file_path)
+                valid_files.append(file_path)
+            except Exception as e:
+                print(f"Erro ao salvar arquivo {filename}: {e}")
+                flash(f'Erro ao salvar arquivo {filename}: {e}', 'error')
         else:
             flash(f'Arquivo {file.filename} não permitido. Use apenas imagens (jpg, jpeg, png) ou vídeos (mp4, avi).', 'error')
     
@@ -329,7 +337,11 @@ def limpar():
     for filename in os.listdir(app.config['UPLOAD_FOLDER']):
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         if os.path.isfile(file_path):
-            os.remove(file_path)
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Erro ao remover arquivo temporário {file_path}: {e}")
+                flash(f'Erro ao remover arquivo temporário {filename}: {e}', 'error')
     
     flash('Arquivos temporários removidos com sucesso', 'success')
     return redirect(url_for('index'))

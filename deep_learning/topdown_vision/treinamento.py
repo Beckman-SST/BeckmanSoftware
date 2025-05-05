@@ -1,5 +1,9 @@
 import deeplabcut
 import os
+import cv2
+import numpy as np
+import math
+import yaml
 
 # Definindo caminhos absolutos baseados na localização atual do script
 DIR_BASE = os.path.dirname(os.path.abspath(__file__))
@@ -20,6 +24,53 @@ def verificar_projeto():
     return os.path.exists(config_path)
 
 # Função para criar um novo projeto DeepLabCut
+def calcular_angulo(p1, p2, p3):
+    """Calcula o ângulo entre três pontos."""
+    if None in [p1, p2, p3]:
+        return None
+    
+    try:
+        # Converter para arrays numpy
+        a = np.array(p1)
+        b = np.array(p2)
+        c = np.array(p3)
+        
+        # Calcular vetores
+        ba = a - b
+        bc = c - b
+        
+        # Calcular ângulo
+        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+        angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
+        
+        # Converter para graus
+        return np.degrees(angle)
+        
+    except Exception as e:
+        print(f"ERRO ao calcular ângulo: {str(e)}")
+        return None
+
+def desenhar_angulo(imagem, p1, p2, p3, angulo):
+    """Desenha o ângulo na imagem."""
+    if None in [p1, p2, p3, angulo]:
+        return imagem
+    
+    try:
+        # Desenhar linhas entre os pontos
+        cv2.line(imagem, tuple(p1.astype(int)), tuple(p2.astype(int)), (0, 255, 0), 2)
+        cv2.line(imagem, tuple(p2.astype(int)), tuple(p3.astype(int)), (0, 255, 0), 2)
+        
+        # Adicionar texto com o ângulo
+        texto = f"{angulo:.1f}°"
+        cv2.putText(imagem, texto, tuple(p2.astype(int)), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        
+        return imagem
+        
+    except Exception as e:
+        print(f"ERRO ao desenhar ângulo: {str(e)}")
+        return imagem
+
 def criar_projeto():
     print("\n===== CRIANDO NOVO PROJETO DEEPLABCUT =====\n")
     print(f"Projeto: {NOME_PROJETO}")
@@ -43,7 +94,7 @@ def criar_projeto():
     for img in imagens:
         print(f" - {img}")
     
-    # Criar o projeto DeepLabCut
+    # Criar o projeto DeepLabCut com pontos específicos
     try:
         deeplabcut.create_new_project(
             NOME_PROJETO,
@@ -52,6 +103,16 @@ def criar_projeto():
             working_directory=PROJECT_PATH,
             copy_videos=True
         )
+        
+        # Configurar os pontos específicos para rastreamento editando o YAML
+        config_path = os.path.join(PROJECT_PATH, f'config_{NOME_PROJETO}_{NOME_EXPERIMENTADOR}.yaml')
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            config['bodyparts'] = ['cotovelo', 'pulso', 'dedo_medio']
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+        
         print("\nProjeto criado com sucesso!")
         return True
     except Exception as e:

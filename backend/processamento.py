@@ -7,29 +7,8 @@ import signal
 import math
 import json
 import tempfile
-import logging
-import datetime
 from ultralytics import YOLO
 from multiprocessing import Pool
-
-# Configuração para processamento de vistas lateral e inferior
-
-# Configuração do sistema de logs
-log_folder = "logs"
-if not os.path.exists(log_folder):
-    os.makedirs(log_folder)
-
-# Configura o logger
-log_file = os.path.join(log_folder, f"processamento_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("processamento")
 
 # Variável global para controle do processamento
 deve_continuar = True
@@ -38,7 +17,7 @@ deve_continuar = True
 def signal_handler(sig, frame):
     global deve_continuar
     deve_continuar = False
-    logger.warning("\nProcessamento recebeu sinal de cancelamento...")
+    print("\nProcessamento recebeu sinal de cancelamento...")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -48,7 +27,7 @@ mpDraw = mp.solutions.drawing_utils
 mpHolistic = mp.solutions.holistic
 
 # Carregar modelo YOLOv8 pré-treinado
-yolo_model = YOLO('yolov8n.pt')  # Modelo nano padrão
+yolo_model = YOLO('yolov8n.pt')  # Modelo nano padrão - substitua por um modelo personalizado se necessário
 
 # Classes de interesse para notebooks e monitores (IDs do dataset COCO)
 CLASSES_OF_INTEREST = [63, 62]  # 63 = laptop, 62 = tv/monitor
@@ -124,8 +103,6 @@ holistic = mpHolistic.Holistic(
     model_complexity=2 
 )
 
-# Configuração para processamento de vistas lateral e inferior
-
 # Buffer para média móvel dos landmarks
 landmark_buffer = []
 
@@ -188,12 +165,10 @@ def calculate_visibility(landmarks, indices):
 # Função para detectar notebooks e monitores com YOLOv8
 def detect_electronics(frame, model, wrist_position=None, is_lower_body=False):
     if is_lower_body:
-        logger.debug("Análise de parte inferior do corpo, pulando detecção de eletrônicos")
         return []
     
     # Usa a confiança definida nas configurações
     CONFIDENCE_THRESHOLD = YOLO_CONFIDENCE
-    logger.debug(f"Iniciando detecção de eletrônicos com confiança: {CONFIDENCE_THRESHOLD}")
         
     # Run detection once and store results with increased confidence
     results = model(frame, verbose=False, conf=CONFIDENCE_THRESHOLD)[0]
@@ -224,7 +199,6 @@ def detect_electronics(frame, model, wrist_position=None, is_lower_body=False):
     valid_indices = np.where(valid_classes & confident_detections)[0]
     
     if not len(valid_indices):
-        logger.warning("Nenhum dispositivo eletrônico detectado com confiança suficiente")
         return []
         
     boxes = results.boxes.xyxy.cpu().numpy()[valid_indices]
@@ -299,51 +273,7 @@ def should_process_lower_body(landmarks):
     foot_visibility = max(right_foot_visibility, left_foot_visibility)
     
     # Retorna True apenas se todos os pontos necessários estiverem visíveis
-    return all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility])
-
-# Função para detectar o tipo de vista (lateral ou inferior)
-def detectar_tipo_vista(frame, landmarks):
-    if landmarks is None or len(landmarks) == 0:
-        # Se não há landmarks detectados, assumir vista lateral como padrão
-        logger.info("Nenhum landmark detectado pelo MediaPipe, assumindo vista lateral")
-        return "lateral"
-    
-    try:
-        # Verificar visibilidade dos pontos-chave
-        right_shoulder = landmarks[mpHolistic.PoseLandmark.RIGHT_SHOULDER.value]
-        left_shoulder = landmarks[mpHolistic.PoseLandmark.LEFT_SHOULDER.value]
-        right_hip = landmarks[mpHolistic.PoseLandmark.RIGHT_HIP.value]
-        left_hip = landmarks[mpHolistic.PoseLandmark.LEFT_HIP.value]
-        right_ankle = landmarks[mpHolistic.PoseLandmark.RIGHT_ANKLE.value]
-        left_ankle = landmarks[mpHolistic.PoseLandmark.LEFT_ANKLE.value]
-        right_knee = landmarks[mpHolistic.PoseLandmark.RIGHT_KNEE.value]
-        left_knee = landmarks[mpHolistic.PoseLandmark.LEFT_KNEE.value]
-        
-        # Calcular visibilidade média dos pontos-chave para cada tipo de vista
-        visibilidade_lateral = (right_shoulder.visibility + left_shoulder.visibility + 
-                               right_hip.visibility + left_hip.visibility) / 4
-        
-        visibilidade_inferior = (right_ankle.visibility + left_ankle.visibility + 
-                               right_knee.visibility + left_knee.visibility) / 4
-        
-        # Verificar a diferença horizontal entre os ombros (para vista lateral)
-        diferenca_ombros = abs(right_shoulder.x - left_shoulder.x)
-        
-        logger.debug(f"Visibilidade lateral: {visibilidade_lateral:.2f}")
-        logger.debug(f"Visibilidade inferior: {visibilidade_inferior:.2f}")
-        logger.debug(f"Diferença horizontal ombros: {diferenca_ombros:.2f}")
-        
-        # Critérios para determinar o tipo de vista
-        if visibilidade_inferior > 0.7 and visibilidade_inferior > visibilidade_lateral:
-            return "inferior"
-        else:
-            # Caso padrão, assumir vista lateral
-            return "lateral"
-    
-    except Exception as e:
-        logger.error(f"Erro ao detectar tipo de vista: {str(e)}")
-        # Em caso de erro, assumir vista lateral (comportamento padrão)
-        return "lateral"
+    return all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility]) 
 
 # Função para ajustar posição do texto para evitar sobreposição
 def adjust_text_position(frame, text, position, bbox=None):
@@ -370,31 +300,25 @@ output_folder = "Output"
 # Verifica se a pasta já existe
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
-    logger.info(f"Pasta '{output_folder}' criada com sucesso.")
+    print(f"Pasta '{output_folder}' criada com sucesso.")
 else:
-    logger.info(f"Pasta '{output_folder}' já existe. As imagens serão salvas nela.")
+    print(f"Pasta '{output_folder}' já existe. As imagens serão salvas nela.")
 
 # Obtém o caminho do arquivo passado como argumento
 input_path = sys.argv[1]
 
 # Verificar se o conteúdo é uma imagem
-logger.info(f"Iniciando processamento do arquivo: {input_path}")
 image = cv.imread(input_path)
 is_image = image is not None
 
-# Função removida: carregamento do modelo AlphaPose
-
 if is_image:
-    logger.info(f"Arquivo detectado como imagem")
     frames = [image]
 else:
-    logger.info(f"Tentando abrir como vídeo")
     cap = cv.VideoCapture(input_path)
     if not cap.isOpened():
-        logger.error(f"Erro ao carregar o vídeo: {input_path}. Verifique o caminho e o arquivo.")
+        print(f"Erro ao carregar o vídeo: {input_path}. Verifique o caminho e o arquivo.")
         frames = []
     else:
-        logger.info(f"Vídeo carregado com sucesso, extraindo frames")
         frames = []
         while cap.isOpened() and deve_continuar:
             ret, frame = cap.read()
@@ -402,7 +326,6 @@ else:
                 break
             frames.append(frame)
         cap.release()
-        logger.info(f"Total de {len(frames)} frames extraídos do vídeo")
 
 for frame_idx, frame in enumerate(frames):
     if not deve_continuar:
@@ -415,10 +338,7 @@ for frame_idx, frame in enumerate(frames):
     imgRGB = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
     results = holistic.process(imgRGB)
     
-    # Inicializa variáveis para processamento
-    tipo_vista = "lateral"
-    
-    # Validação e suavização dos landmarks do MediaPipe
+    # Validação e suavização dos landmarks
     if results.pose_landmarks:
         current_landmarks = [(lm.x, lm.y, lm.z, lm.visibility) for lm in results.pose_landmarks.landmark]
         
@@ -442,12 +362,6 @@ for frame_idx, frame in enumerate(frames):
                 results.pose_landmarks.landmark[i].y = y_avg
                 results.pose_landmarks.landmark[i].z = z_avg
                 results.pose_landmarks.landmark[i].visibility = vis_avg
-        
-        # Detecta o tipo de vista (lateral ou inferior)
-        tipo_vista = detectar_tipo_vista(frame, results.pose_landmarks.landmark)
-    else:
-        # Se o MediaPipe não detectou landmarks, assume vista lateral
-        tipo_vista = "lateral"
     
     # Inicializa as variáveis
     landmarks = None
@@ -456,11 +370,10 @@ for frame_idx, frame in enumerate(frames):
     
     # Verifica se os landmarks principais foram detectados
     if not results.pose_landmarks:
-        logger.error(f"Frame {frame_idx}: Não foi possível detectar os landmarks principais do corpo na imagem.")
+        print("\nERRO: Não foi possível detectar os landmarks principais do corpo na imagem.")
         # Salva a imagem original sem processamento
         output_path = os.path.join(output_folder, f"error_{os.path.basename(input_path)}")
         cv.imwrite(output_path, frame)
-        logger.info(f"Imagem original salva em: {output_path}")
         continue
     
     # Verifica se há landmarks da pose
@@ -479,23 +392,11 @@ for frame_idx, frame in enumerate(frames):
                 wrist_position = (int(landmarks[mpHolistic.PoseLandmark.LEFT_WRIST.value].x * frame.shape[1]),
                                 int(landmarks[mpHolistic.PoseLandmark.LEFT_WRIST.value].y * frame.shape[0]))
     
-    # Verificar o tipo de análise (parte inferior ou superior)
-    is_lower_body = False
-    if results.pose_landmarks:
-        is_lower_body = should_process_lower_body(results.pose_landmarks.landmark)
-    
-    # Log do tipo de análise
-    logger.info(f"Frame {frame_idx}: Tipo de análise: {'parte inferior do corpo' if is_lower_body else 'parte superior do corpo'} - Vista: {tipo_vista}")
+    # Verificar se é análise da parte inferior do corpo
+    is_lower_body = should_process_lower_body(results.pose_landmarks.landmark) if results.pose_landmarks else False
 
     # Detectar objetos eletrônicos apenas se não for análise da parte inferior
-    logger.info(f"Frame {frame_idx}: Iniciando detecção de dispositivos eletrônicos")
     electronics_detections = detect_electronics(frame, yolo_model, wrist_position, is_lower_body)
-    if electronics_detections:
-        logger.info(f"Frame {frame_idx}: {len(electronics_detections)} dispositivo(s) eletrônico(s) detectado(s)")
-        for i, det in enumerate(electronics_detections):
-            logger.debug(f"Dispositivo {i+1}: {det['class']} (confiança: {det['confidence']:.2f})")
-    else:
-        logger.warning(f"Frame {frame_idx}: Nenhum dispositivo eletrônico detectado")
     
     # Cria uma cópia limpa do frame para desenhar os landmarks
     frame_clean = frame.copy()
@@ -559,38 +460,10 @@ for frame_idx, frame in enumerate(frames):
 
     try:
         landmarks = results.pose_landmarks.landmark
-        
-        # Desenha os ângulos calculados no frame
-        if angulos:
-            h, w = frame.shape[:2]
-            for nome_angulo, valor in angulos.items():
-                # Define a posição do texto com base no tipo de ângulo
-                if 'cotovelo_direito' in nome_angulo:
-                    posicao = (int(w * 0.75), int(h * 0.3))
-                elif 'cotovelo_esquerdo' in nome_angulo:
-                    posicao = (int(w * 0.25), int(h * 0.3))
-                elif 'pulso_direito' in nome_angulo:
-                    posicao = (int(w * 0.75), int(h * 0.4))
-                elif 'pulso_esquerdo' in nome_angulo:
-                    posicao = (int(w * 0.25), int(h * 0.4))
-                else:
-                    posicao = (int(w * 0.5), int(h * 0.5))
-                
-                # Formata o texto do ângulo
-                texto = f"{nome_angulo.replace('_', ' ').title()}: {valor:.1f}°"
-                
-                # Desenha o texto com fundo para melhor visibilidade
-                (text_width, text_height), _ = cv.getTextSize(texto, cv.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-                cv.rectangle(frame_clean, 
-                           (posicao[0] - 5, posicao[1] - text_height - 5), 
-                           (posicao[0] + text_width + 5, posicao[1] + 5), 
-                           (0, 0, 0), -1)
-                cv.putText(frame_clean, texto, posicao, cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv.LINE_AA)
     except:
         landmarks = None
-    
-    # Processa os ângulos com MediaPipe para vistas lateral e inferior
-    if landmarks is not None and deve_continuar:
+
+    if landmarks and deve_continuar:
         process_lower = should_process_lower_body(landmarks)
         
         if process_lower:
@@ -599,6 +472,7 @@ for frame_idx, frame in enumerate(frames):
                 mpHolistic.PoseLandmark.RIGHT_HIP.value,
                 mpHolistic.PoseLandmark.RIGHT_KNEE.value,
                 mpHolistic.PoseLandmark.RIGHT_ANKLE.value,
+                mpHolistic.PoseLandmark.RIGHT_FOOT_INDEX.value
             ]
             
             left_leg_indices = [
@@ -736,19 +610,17 @@ for frame_idx, frame in enumerate(frames):
             visible_landmarks = results.pose_landmarks
 
             if right_visibility > left_visibility:
-                logger.info(f"Frame {frame_idx}: Lado direito mais visível. Processando lado direito.")
+                print("Lado direito mais visível. Processando lado direito.")
                 side = "right"
                 indices_manter = right_indices
                 eye_position = (int(landmarks[mpHolistic.PoseLandmark.RIGHT_EYE.value].x * frame_clean.shape[1]),
                                int(landmarks[mpHolistic.PoseLandmark.RIGHT_EYE.value].y * frame_clean.shape[0]))
-                logger.debug(f"Posição do olho direito: {eye_position}")
             else:
-                logger.info(f"Frame {frame_idx}: Lado esquerdo mais visível. Processando lado esquerdo.")
+                print("Lado esquerdo mais visível. Processando lado esquerdo.")
                 side = "left"
                 indices_manter = left_indices
                 eye_position = (int(landmarks[mpHolistic.PoseLandmark.LEFT_EYE.value].x * frame_clean.shape[1]),
                                int(landmarks[mpHolistic.PoseLandmark.LEFT_EYE.value].y * frame_clean.shape[0]))
-                logger.debug(f"Posição do olho esquerdo: {eye_position}")
 
             # Oculta todos os landmarks exceto os do lado selecionado
             for i in range(len(visible_landmarks.landmark)):
@@ -767,10 +639,8 @@ for frame_idx, frame in enumerate(frames):
             # Calcula o ângulo de abertura dos olhos em relação ao dispositivo eletrônico
             # Sempre calcula os ângulos dos olhos, independente da configuração SHOW_ELECTRONICS
             if electronics_detections:
-                logger.info(f"Frame {frame_idx}: Dispositivo eletrônico detectado, calculando ângulo dos olhos")
                 detection = electronics_detections[0]
                 x1, y1, x2, y2 = detection['bbox']
-                logger.debug(f"Bounding box do dispositivo: ({x1}, {y1}, {x2}, {y2})")
                 
                 if side == "left":
                     # Para pessoa virada à esquerda: superior esquerdo e inferior direito
@@ -780,7 +650,6 @@ for frame_idx, frame in enumerate(frames):
                     # Usa os vértices da caixa como pontos finais das retas
                     prolonged_top = prolongar_reta(eye_position, top_left)
                     prolonged_bottom = prolongar_reta(eye_position, bottom_right)
-                    logger.debug(f"Pontos para cálculo (lado esquerdo): olho={eye_position}, topo={top_left}, base={bottom_right}")
                 else:
                     # Para pessoa virada à direita: superior direito e inferior esquerdo
                     top_right = (x2, y1)
@@ -789,29 +658,21 @@ for frame_idx, frame in enumerate(frames):
                     # Usa os vértices da caixa como pontos finais das retas
                     prolonged_top = prolongar_reta(eye_position, top_right)
                     prolonged_bottom = prolongar_reta(eye_position, bottom_left)
-                    logger.debug(f"Pontos para cálculo (lado direito): olho={eye_position}, topo={top_right}, base={bottom_left}")
                 
                 # Desenha as retas prolongadas apenas se SHOW_ANGLES estiver ativado
                 if SHOW_ANGLES:
                     cv.line(frame_clean, eye_position, prolonged_top, (0, 0, 255), 2)
                     cv.line(frame_clean, eye_position, prolonged_bottom, (0, 0, 255), 2)
                 
-                try:
-                    # Calcula o ângulo entre as retas
-                    eye_angle = calculate_angle(prolonged_top, eye_position, prolonged_bottom)
-                    logger.info(f"Frame {frame_idx}: Ângulo dos olhos calculado: {eye_angle:.2f} graus")
-                    
-                    # Adiciona o texto do ângulo próximo ao olho se SHOW_ANGLES estiver ativado
-                    if SHOW_ANGLES:
-                        eye_text = f"{eye_angle:.2f}graus"
-                        text_position = (eye_position[0] + 10, eye_position[1] - 10)
-                        cv.putText(frame_clean, eye_text, text_position,
-                                  cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                except Exception as e:
-                    logger.error(f"Frame {frame_idx}: Erro ao calcular ângulo dos olhos: {str(e)}")
-                    logger.error(f"Dados para debug: eye_position={eye_position}, prolonged_top={prolonged_top}, prolonged_bottom={prolonged_bottom}")
-            else:
-                logger.warning(f"Frame {frame_idx}: Nenhum dispositivo eletrônico detectado, não foi possível calcular o ângulo dos olhos")
+                # Calcula o ângulo entre as retas
+                eye_angle = calculate_angle(prolonged_top, eye_position, prolonged_bottom)
+                
+                # Adiciona o texto do ângulo próximo ao olho se SHOW_ANGLES estiver ativado
+                if SHOW_ANGLES:
+                    eye_text = f"{eye_angle:.2f}graus"
+                    text_position = (eye_position[0] + 10, eye_position[1] - 10)
+                    cv.putText(frame_clean, eye_text, text_position,
+                              cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
             # Cálculo dos ângulos
             if side == "right":
@@ -841,10 +702,10 @@ for frame_idx, frame in enumerate(frames):
             middle_finger_px = (int(middle_finger[0] * w), int(middle_finger[1] * h))
 
             elbow_angle = calculate_angle(shoulder, elbow, wrist)
-            logger.info(f"Frame {frame_idx}: Ângulo do cotovelo {side}: {elbow_angle:.2f} graus")
+            print(f"Ângulo do cotovelo {side}: {elbow_angle:.2f} graus")
 
             wrist_angle = calculate_angle(elbow, wrist, middle_finger)
-            logger.info(f"Frame {frame_idx}: Ângulo do pulso {side}: {wrist_angle:.2f} graus")
+            print(f"Ângulo do pulso {side}: {wrist_angle:.2f} graus")
 
             # Ajustar posição do texto para evitar sobreposição
             elbow_text = f"{elbow_angle:.2f} graus"
@@ -865,13 +726,12 @@ for frame_idx, frame in enumerate(frames):
         if deve_continuar:
             output_path = os.path.join(output_folder, f"processed_{os.path.basename(input_path)}_{frame_idx}.jpg")
             cv.imwrite(output_path, frame_final)
-            logger.info(f"Frame {frame_idx}: Imagem processada salva em: {output_path}")
+            print(f"Imagem salva em: {output_path}")
         else:
-            logger.warning("Processamento cancelado - arquivo não salvo")
+            print("Processamento cancelado - arquivo não salvo")
             break
 
-logger.info("Processamento finalizado")
-print(f"\nProcessamento finalizado. Log detalhado salvo em: {log_file}")
+print("Processamento finalizado")
 
 
 def process_frames_parallel(frames):

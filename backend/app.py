@@ -15,10 +15,18 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'beckman_project_secret_key'
 app.config['UPLOAD_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
-app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Output'))
+app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Output'))
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max
 app.config['ALLOWED_EXTENSIONS'] = {'jpg', 'jpeg', 'png', 'mp4', 'avi'}
-app.config['CONFIG_FILE'] = 'config.json'
+app.config['CONFIG_FILE'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'config.json'))
+
+# Garante que as pastas necessárias existem
+for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
+    try:
+        os.makedirs(folder, exist_ok=True)
+        print(f"Pasta criada/verificada com sucesso: {folder}")
+    except Exception as e:
+        print(f"Erro ao criar/verificar pasta {folder}: {e}")
 
 # Variáveis globais para controle do processamento
 processamento_ativo = False
@@ -91,8 +99,13 @@ def atualizar_status_processamento(status):
 # Função para extrair erros dos logs
 def extract_errors_from_log(log_file):
     try:
-        with open(log_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Tenta ler com UTF-8 primeiro, depois fallback para latin-1
+        try:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            with open(log_file, 'r', encoding='latin-1') as f:
+                content = f.read()
             
         # Procura por mensagens de erro no log
         error_pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - ERROR - (.+)'
@@ -103,11 +116,28 @@ def extract_errors_from_log(log_file):
         return []
 
 # Função para processar os arquivos em uma thread separada
+# Lista thread-safe para armazenar mensagens de erro
+error_messages = []
+
+def adicionar_erro(mensagem):
+    """Adiciona uma mensagem de erro à lista thread-safe"""
+    error_messages.append(mensagem)
+
 def processar_arquivos(file_paths):
     global processamento_ativo, cancelar_processamento, arquivo_atual, total_files, tempos_processamento
     
     processamento_ativo = True
     cancelar_processamento = False
+    error_messages.clear()  # Limpa mensagens de erro anteriores
+    
+    # Limpa o arquivo de status para garantir que não haja configurações residuais
+    status_file = os.path.join(tempfile.gettempdir(), 'processamento_status.json')
+    if os.path.exists(status_file):
+        try:
+            with open(status_file, 'w') as f:
+                json.dump({'deve_continuar': True}, f)
+        except Exception as e:
+            print(f"Erro ao limpar arquivo de status: {e}")
     
     # Processa cada arquivo
     total_files = len(file_paths)
@@ -129,7 +159,7 @@ def processar_arquivos(file_paths):
         })
         
         try:
-            processo = subprocess.Popen([sys.executable, "processamento.py", file_path],
+            processo = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "processamento.py"), file_path],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE)
             
@@ -147,8 +177,9 @@ def processar_arquivos(file_paths):
                         erro_msg = stderr.decode('utf-8')
                     except UnicodeDecodeError:
                         erro_msg = stderr.decode('latin-1')
-                    print(f"Erro ao processar {os.path.basename(file_path)}:\n{erro_msg}")
-                    flash(f"Erro ao processar {os.path.basename(file_path)}: {erro_msg}", "error")
+                    erro = f"Erro ao processar {os.path.basename(file_path)}: {erro_msg}"
+                    print(erro)
+                    adicionar_erro(erro)
                     continue
                 
                 # Verifica o arquivo de log mais recente para extrair erros
@@ -159,11 +190,13 @@ def processar_arquivos(file_paths):
                     if errors:
                         for error in errors:
                             if "Não foi possível detectar os landmarks principais do corpo" in error:
-                                flash(f"Erro ao processar {os.path.basename(file_path)}: {error}", "error")
+                                erro = f"Erro ao processar {os.path.basename(file_path)}: {error}"
+                                adicionar_erro(erro)
                                 break
         except Exception as e:
-            print(f"Erro ao executar processamento: {str(e)}")
-            flash(f"Erro ao executar processamento de {os.path.basename(file_path)}: {str(e)}", "error")
+            erro = f"Erro ao executar processamento de {os.path.basename(file_path)}: {str(e)}"
+            print(erro)
+            adicionar_erro(erro)
             continue
             
         tempo_arquivo = time.time() - arquivo_start_time
@@ -186,11 +219,22 @@ def processar_arquivos(file_paths):
     processamento_ativo = False
 
 # Rota principal
+@app.route('/get_errors')
+def get_errors():
+    """Endpoint para recuperar mensagens de erro acumuladas"""
+    global error_messages
+    return jsonify(errors=error_messages)
+
 @app.route('/')
 def index():
     # Lista os arquivos processados
     processed_files = []
     error_files = []
+    
+    # Exibe erros acumulados, se houver
+    for error in error_messages:
+        flash(error, 'error')
+    error_messages.clear()
     
     if os.path.exists(app.config['OUTPUT_FOLDER']):
         all_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER']) 
@@ -298,12 +342,21 @@ def cancelar():
 # Rota para verificar o status do processamento
 @app.route('/status')
 def status():
-    global arquivo_atual, total_files, tempos_processamento
+    global arquivo_atual, total_files, tempos_processamento, error_messages
     
     status_info = {
         'ativo': processamento_ativo,
-        'cancelando': cancelar_processamento
+        'cancelando': cancelar_processamento,
+        'erros': error_messages[:],  # Envia uma cópia da lista de erros
+        'arquivos_processados': []
     }
+    
+    # Verifica arquivos já processados na pasta Output
+    if os.path.exists(app.config['OUTPUT_FOLDER']):
+        status_info['arquivos_processados'] = [
+            f for f in os.listdir(app.config['OUTPUT_FOLDER'])
+            if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f))
+        ]
     
     if processamento_ativo and arquivo_atual > 0:
         # Calcula tempo médio e estimativa restante
@@ -311,15 +364,16 @@ def status():
         arquivos_restantes = total_files - arquivo_atual
         tempo_restante = int(tempo_medio * arquivos_restantes) if tempo_medio > 0 else 0
         
-        # Adiciona informações de progresso
+        # Adiciona informações detalhadas de progresso
         status_info.update({
             'arquivo_atual': arquivo_atual,
             'total_arquivos': total_files,
             'progresso': (arquivo_atual / total_files) * 100 if total_files > 0 else 0,
-            'tempo_restante': tempo_restante
+            'tempo_restante': tempo_restante,
+            'tempo_medio_por_arquivo': round(tempo_medio, 2) if tempo_medio > 0 else 0
         })
     
-    return status_info
+    return jsonify(status_info)
 
 # Rota para servir os arquivos processados
 @app.route('/output/<filename>')
@@ -370,8 +424,13 @@ def get_log_files():
 # Função para ler o conteúdo de um arquivo de log
 def read_log_file(log_file):
     try:
-        with open(log_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        # Tenta ler com UTF-8 primeiro, depois fallback para latin-1
+        try:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            with open(log_file, 'r', encoding='latin-1') as f:
+                content = f.read()
         return content
     except Exception as e:
         return f"Erro ao ler arquivo de log: {str(e)}"

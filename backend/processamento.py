@@ -253,27 +253,50 @@ def should_process_lower_body(landmarks):
     if not PROCESS_LOWER_BODY:
         return False
         
-    # Verifica a visibilidade dos tornozelos
+    # Verifica a visibilidade dos landmarks inferiores
     right_ankle_visibility = landmarks[mpHolistic.PoseLandmark.RIGHT_ANKLE.value].visibility
     left_ankle_visibility = landmarks[mpHolistic.PoseLandmark.LEFT_ANKLE.value].visibility
     ankle_visibility = max(right_ankle_visibility, left_ankle_visibility)
     
-    # Se a visibilidade do tornozelo for 0, processa como imagem de perfil (ângulos superiores)
-    if ankle_visibility == 0:
-        return False
-    
-    # Para ângulos inferiores, verifica a visibilidade do joelho, tornozelo e foot index
     right_knee_visibility = landmarks[mpHolistic.PoseLandmark.RIGHT_KNEE.value].visibility
     left_knee_visibility = landmarks[mpHolistic.PoseLandmark.LEFT_KNEE.value].visibility
+    knee_visibility = max(right_knee_visibility, left_knee_visibility)
+    
     right_foot_visibility = landmarks[mpHolistic.PoseLandmark.RIGHT_FOOT_INDEX.value].visibility
     left_foot_visibility = landmarks[mpHolistic.PoseLandmark.LEFT_FOOT_INDEX.value].visibility
-    
-    # Calcula a visibilidade média dos pontos necessários para ângulos inferiores
-    knee_visibility = max(right_knee_visibility, left_knee_visibility)
     foot_visibility = max(right_foot_visibility, left_foot_visibility)
     
-    # Retorna True apenas se todos os pontos necessários estiverem visíveis
-    return all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility]) 
+    # Verifica a visibilidade dos landmarks superiores
+    right_shoulder_visibility = landmarks[mpHolistic.PoseLandmark.RIGHT_SHOULDER.value].visibility
+    left_shoulder_visibility = landmarks[mpHolistic.PoseLandmark.LEFT_SHOULDER.value].visibility
+    shoulder_visibility = max(right_shoulder_visibility, left_shoulder_visibility)
+    
+    right_elbow_visibility = landmarks[mpHolistic.PoseLandmark.RIGHT_ELBOW.value].visibility
+    left_elbow_visibility = landmarks[mpHolistic.PoseLandmark.LEFT_ELBOW.value].visibility
+    elbow_visibility = max(right_elbow_visibility, left_elbow_visibility)
+    
+    right_wrist_visibility = landmarks[mpHolistic.PoseLandmark.RIGHT_WRIST.value].visibility
+    left_wrist_visibility = landmarks[mpHolistic.PoseLandmark.LEFT_WRIST.value].visibility
+    wrist_visibility = max(right_wrist_visibility, left_wrist_visibility)
+    
+    # Calcula a visibilidade média dos pontos inferiores e superiores
+    lower_visibility_avg = (knee_visibility + ankle_visibility + foot_visibility) / 3
+    upper_visibility_avg = (shoulder_visibility + elbow_visibility + wrist_visibility) / 3
+    
+    # Se a visibilidade do tornozelo for 0, processa como imagem de perfil (ângulos superiores)
+    if ankle_visibility == 0 or foot_visibility == 0:
+        return False
+    
+    # Verifica se os landmarks inferiores têm visibilidade alta
+    lower_landmarks_visible = all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility])
+    
+    # Compara a visibilidade dos landmarks inferiores com os superiores
+    # Se os landmarks inferiores têm visibilidade significativamente maior que os superiores
+    # ou se os landmarks inferiores têm visibilidade muito alta em geral, processa como parte inferior
+    if lower_landmarks_visible and (lower_visibility_avg > upper_visibility_avg * 0.8 or lower_visibility_avg > 0.8):
+        return True
+    
+    return False
 
 # Função para ajustar posição do texto para evitar sobreposição
 def adjust_text_position(frame, text, position, bbox=None):
@@ -669,7 +692,7 @@ for frame_idx, frame in enumerate(frames):
                 
                 # Adiciona o texto do ângulo próximo ao olho se SHOW_ANGLES estiver ativado
                 if SHOW_ANGLES:
-                    eye_text = f"{eye_angle:.2f}graus"
+                    eye_text = f"{eye_angle:.2f} graus"
                     text_position = (eye_position[0] + 10, eye_position[1] - 10)
                     cv.putText(frame_clean, eye_text, text_position,
                               cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)

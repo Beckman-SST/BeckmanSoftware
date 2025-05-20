@@ -6,7 +6,7 @@
     "show_face_blur": true,
     "show_electronics": false,
     "show_angles": true,
-    "show_upper_body": false,
+    "show_upper_body": true,
     "show_lower_body": true,
     "process_lower_body": true,
     "resize_width": 800

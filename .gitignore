@@ -48,5 +48,4 @@ venv/Lib/site-packages/jaxlib/
 venv/Lib/site-packages/torch/lib/torch_cpu.dll
 venv/Lib/site-packages/torch/lib/dnnl.lib
 venv/Lib/site-packages/jaxlib/xla_extension.pyd
-backend/processamento_modular.py
-backend/uploads/funcionario2.jpg
+backend/uploads

@@ -10,18 +10,21 @@ import re
 import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
+from PIL import Image
+import uuid
 
 # Configurações da aplicação
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'beckman_project_secret_key'
 app.config['UPLOAD_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
 app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Output'))
+app.config['MERGE_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Merge'))
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max
 app.config['ALLOWED_EXTENSIONS'] = {'jpg', 'jpeg', 'png', 'mp4', 'avi'}
 app.config['CONFIG_FILE'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'config.json'))
 
 # Garante que as pastas necessárias existem
-for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
+for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['MERGE_FOLDER']]:
     try:
         os.makedirs(folder, exist_ok=True)
         print(f"Pasta criada/verificada com sucesso: {folder}")
@@ -410,6 +413,92 @@ def abrir_pasta():
         elif os.name == 'posix':  # macOS e Linux
             subprocess.Popen(['open', output_path] if sys.platform == 'darwin' else ['xdg-open', output_path])
     return {'success': True, 'path': output_path}
+
+# Rota para abrir a pasta de merge
+@app.route('/abrir-pasta-merge')
+def abrir_pasta_merge():
+    merge_path = os.path.abspath(app.config['MERGE_FOLDER'])
+    if os.path.exists(merge_path):
+        if os.name == 'nt':  # Windows
+            os.startfile(merge_path)
+        elif os.name == 'posix':  # macOS e Linux
+            subprocess.Popen(['open', merge_path] if sys.platform == 'darwin' else ['xdg-open', merge_path])
+    return {'success': True, 'path': merge_path}
+
+# Rota para a página de relatório
+@app.route('/relatorio')
+def relatorio():
+    processed_files = []
+    if os.path.exists(app.config['OUTPUT_FOLDER']):
+        processed_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER']) 
+                        if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f)) 
+                        and not f.startswith('error_')]
+    return render_template('relatorio.html', processed_files=processed_files)
+
+# Rota para unir imagens selecionadas
+# Rota para servir arquivos da pasta Merge
+@app.route('/merge/<filename>')
+def merge_file(filename):
+    return send_from_directory(app.config['MERGE_FOLDER'], filename)
+
+@app.route('/unir_imagens', methods=['POST'])
+def unir_imagens():
+    try:
+        # Recebe a lista de imagens selecionadas
+        imagens = request.json.get('imagens', [])
+        if len(imagens) < 2:
+            return jsonify({'error': 'Selecione pelo menos duas imagens'}), 400
+
+        # Lista para armazenar as imagens carregadas
+        images = []
+        max_height = 0
+        total_width = 0
+
+        # Carrega todas as imagens e calcula dimensões
+        for img_name in imagens:
+            img_path = os.path.join(app.config['OUTPUT_FOLDER'], img_name)
+            if not os.path.exists(img_path):
+                continue
+            
+            img = Image.open(img_path)
+            images.append(img)
+            max_height = max(max_height, img.size[1])
+            total_width += img.size[0]
+
+        if not images:
+            return jsonify({'error': 'Nenhuma imagem válida encontrada'}), 400
+
+        # Cria uma nova imagem com as dimensões calculadas
+        result = Image.new('RGB', (total_width, max_height))
+        current_width = 0
+
+        # Cola cada imagem na posição correta
+        for img in images:
+            # Redimensiona a altura mantendo a proporção
+            if img.size[1] != max_height:
+                ratio = max_height / img.size[1]
+                new_width = int(img.size[0] * ratio)
+                img = img.resize((new_width, max_height), Image.Resampling.LANCZOS)
+
+            result.paste(img, (current_width, 0))
+            current_width += img.size[0]
+
+        # Gera um nome único para a imagem resultante
+        output_filename = f'merged_{uuid.uuid4().hex[:8]}.jpg'
+        output_path = os.path.join(app.config['MERGE_FOLDER'], output_filename)
+
+        # Salva a imagem resultante
+        result.save(output_path, 'JPEG', quality=95)
+
+        return jsonify({
+            'success': True,
+            'message': 'Imagens unidas com sucesso',
+            'filename': output_filename,
+            'url': url_for('merge_file', filename=output_filename)
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # Função para obter logs do sistema
 def get_log_files():

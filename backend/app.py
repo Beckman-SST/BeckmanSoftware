@@ -12,6 +12,18 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from PIL import Image
 import uuid
+from modules.video_processor import VideoProcessor
+
+# Função para processar vídeo
+def process_video_file(input_path):
+    try:
+        processor = VideoProcessor()
+        output_path = processor.process_video(input_path, app.config['OUTPUT_FOLDER'])
+        if output_path:
+            return True, f"Vídeo processado com sucesso: {output_path}"
+        return False, "Erro ao processar o vídeo"
+    except Exception as e:
+        return False, f"Erro durante o processamento do vídeo: {str(e)}"
 
 # Configurações da aplicação
 app = Flask(__name__)
@@ -38,6 +50,17 @@ status_file = os.path.join(tempfile.gettempdir(), 'processamento_status.json')
 arquivo_atual = 0
 total_files = 0
 tempos_processamento = []
+processing_logs = []  # Lista para armazenar os logs do processamento
+
+# Função para adicionar log
+def add_log(message):
+    global processing_logs
+    timestamp = datetime.datetime.now().strftime('%H:%M:%S')
+    log_entry = f'[{timestamp}] {message}'
+    processing_logs.append(log_entry)
+    # Manter apenas os últimos 100 logs
+    if len(processing_logs) > 100:
+        processing_logs = processing_logs[-100:]
 
 # Configurações padrão
 default_config = {
@@ -132,8 +155,11 @@ def processar_arquivos(file_paths):
     processamento_ativo = True
     cancelar_processamento = False
     error_messages.clear()  # Limpa mensagens de erro anteriores
+    processing_logs.clear()  # Limpa logs anteriores
     
-    # Limpa o arquivo de status para garantir que não haja configurações residuais
+    add_log('Iniciando processamento de arquivos')
+    
+    # Limpa o arquivo de status
     status_file = os.path.join(tempfile.gettempdir(), 'processamento_status.json')
     if os.path.exists(status_file):
         try:
@@ -147,79 +173,85 @@ def processar_arquivos(file_paths):
     tempos_processamento = []
     arquivo_atual = 0
     tempo_inicio = time.time()
+    
+    add_log(f'Total de arquivos para processar: {total_files}')
 
     for i, file_path in enumerate(file_paths):
         if cancelar_processamento:
+            add_log('Processamento cancelado pelo usuário')
             break
             
         arquivo_atual = i + 1
         arquivo_start_time = time.time()
+        filename = os.path.basename(file_path)
+        log_messages = []  # Lista para agrupar mensagens de log do arquivo atual
         
-        # Atualiza status para o processo filho
+        # Atualiza status
         atualizar_status_processamento({
             'deve_continuar': True,
             'arquivo_atual': file_path
         })
         
         try:
-            processo = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "processamento.py"), file_path],
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-            
-            while processo.poll() is None:
-                if cancelar_processamento:
-                    atualizar_status_processamento({'deve_continuar': False})
-                    processo.terminate()
-                    break
-                time.sleep(0.1)
-            
-            if not cancelar_processamento:
-                stdout, stderr = processo.communicate()
-                if processo.returncode != 0:
-                    try:
-                        erro_msg = stderr.decode('utf-8')
-                    except UnicodeDecodeError:
-                        erro_msg = stderr.decode('latin-1')
-                    erro = f"Erro ao processar {os.path.basename(file_path)}: {erro_msg}"
-                    print(erro)
-                    adicionar_erro(erro)
+            # Verifica se é um arquivo de vídeo
+            if file_path.lower().endswith(('.mp4', '.avi')):
+                log_messages.append(f'Iniciando processamento do vídeo')
+                success, message = process_video_file(file_path)
+                if not success:
+                    log_messages.append(f'Erro no processamento: {message}')
+                    adicionar_erro(message)
                     continue
+                log_messages.append('Vídeo processado com sucesso')
+            else:
+                # Processamento existente para imagens
+                log_messages.append('Iniciando processamento da imagem')
+                processo = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "processamento.py"), file_path],
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE)
                 
-                # Verifica o arquivo de log mais recente para extrair erros
-                log_files = get_log_files()
-                if log_files:
-                    latest_log = log_files[0]  # O mais recente está no topo
-                    errors = extract_errors_from_log(latest_log)
-                    if errors:
-                        for error in errors:
-                            if "Não foi possível detectar os landmarks principais do corpo" in error:
-                                erro = f"Erro ao processar {os.path.basename(file_path)}: {error}"
-                                adicionar_erro(erro)
-                                break
-        except Exception as e:
-            erro = f"Erro ao executar processamento de {os.path.basename(file_path)}: {str(e)}"
-            print(erro)
-            adicionar_erro(erro)
-            continue
+                while processo.poll() is None:
+                    if cancelar_processamento:
+                        processo.terminate()
+                        log_messages.append('Processamento interrompido')
+                        break
+                    time.sleep(0.1)
+                
+                if not cancelar_processamento:
+                    stdout, stderr = processo.communicate()
+                    
+                    # Verifica o código de retorno do processo
+                    if processo.returncode != 0:
+                        erro = stderr.decode('utf-8', errors='ignore')
+                        log_messages.append(f'Erro no processamento: {erro}')
+                        adicionar_erro(f"Erro ao processar {filename}: {erro}")
+                    else:
+                        log_messages.append('Processamento concluído com sucesso')
             
-        tempo_arquivo = time.time() - arquivo_start_time
-        tempos_processamento.append(tempo_arquivo)
+            # Remove o arquivo de upload após processamento
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                log_messages.append(f'Erro ao remover arquivo de upload: {str(e)}')
+                print(f"Erro ao remover arquivo {file_path}: {e}")
+            
+            # Calcula tempo de processamento
+            tempo_processamento = time.time() - arquivo_start_time
+            tempos_processamento.append(tempo_processamento)
+            log_messages.append(f'Tempo de processamento: {int(tempo_processamento)} segundos')
+                
+        except Exception as e:
+            log_messages.append(f'Erro inesperado: {str(e)}')
+            adicionar_erro(f"Erro inesperado ao processar {filename}: {str(e)}")
         
-        # Atualiza o tempo médio e estimativa restante após cada arquivo processado
-        tempo_medio = sum(tempos_processamento) / len(tempos_processamento)
-        arquivos_restantes = total_files - (i + 1)
-        tempo_restante = int(tempo_medio * arquivos_restantes) if tempo_medio > 0 else 0
-        
-        print(f"Progresso: {arquivo_atual}/{total_files} - Tempo restante: {tempo_restante} segundos")
-
-    # Limpa o arquivo de status
-    if os.path.exists(status_file):
-        try:
-            os.remove(status_file)
-        except:
-            pass
-
+        # Adiciona todas as mensagens do arquivo atual como um único log
+        add_log(f'Arquivo {arquivo_atual}/{total_files} - {filename}:\n' + '\n'.join(f'  - {msg}' for msg in log_messages))
+    
+    tempo_total = time.time() - tempo_inicio
+    add_log(f'Processamento finalizado. Tempo total: {int(tempo_total)} segundos')
+    
     processamento_ativo = False
+    cancelar_processamento = False
+    return True
 
 # Rota principal
 @app.route('/get_errors')
@@ -345,13 +377,14 @@ def cancelar():
 # Rota para verificar o status do processamento
 @app.route('/status')
 def status():
-    global arquivo_atual, total_files, tempos_processamento, error_messages
+    global arquivo_atual, total_files, tempos_processamento, error_messages, processing_logs
     
     status_info = {
         'ativo': processamento_ativo,
         'cancelando': cancelar_processamento,
         'erros': error_messages[:],  # Envia uma cópia da lista de erros
-        'arquivos_processados': []
+        'arquivos_processados': [],
+        'logs': processing_logs[:]  # Adiciona os logs ao retorno
     }
     
     # Verifica arquivos já processados na pasta Output
@@ -567,19 +600,35 @@ def logs():
     page = request.args.get('page', 1, type=int)
     per_page = 10  # Logs por página
     
+    # Obtém os logs do processamento atual
+    current_logs = [{
+        'id': 'current_processing',
+        'date': datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+        'level': 'INFO',
+        'content': '\n'.join(processing_logs)
+    }] if processing_logs else []
+    
+    # Obtém os logs dos arquivos
     log_files = get_log_files()
-    total_logs = len(log_files)
+    file_logs = [parse_log_entry(log_file) for log_file in log_files]
+    
+    # Combina os logs atuais com os logs dos arquivos
+    all_logs = current_logs + file_logs
+    
+    # Calcula a paginação
+    total_logs = len(all_logs)
     total_pages = (total_logs + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
     
-    # Paginação
-    start_idx = (page - 1) * per_page
-    end_idx = min(start_idx + per_page, total_logs)
-    current_logs = log_files[start_idx:end_idx]
+    # Obtém os logs da página atual
+    logs_page = all_logs[start:end]
     
-    # Processar logs para exibição
-    logs_data = [parse_log_entry(log_file) for log_file in current_logs]
-    
-    return render_template('logs.html', logs=logs_data, page=page, total_pages=total_pages)
+    return render_template('logs.html',
+                          logs=logs_page,
+                          page=page,
+                          total_pages=total_pages,
+                          active_page='logs')
 
 # Rota para excluir um log específico
 @app.route('/delete_log', methods=['POST'])
@@ -692,4 +741,44 @@ def delete_logs_range():
     return redirect(url_for('logs'))
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = 5000
+    host = '0.0.0.0'
+    print('\n' + '='*50)
+    print('Iniciando servidor RePosture...')
+    print(f'Interface web disponível em:')
+    print(f' * Local:   http://localhost:{port}')
+    print(f' * Rede:    http://{host}:{port}')
+    print('='*50 + '\n')
+    app.run(debug=True, host=host, port=port)
+
+# Função para processar vídeo
+def process_video_file(input_path):
+    from modules.video_processor import VideoProcessor
+    try:
+        processor = VideoProcessor()
+        output_path = processor.process_video(input_path, app.config['OUTPUT_FOLDER'])
+        if output_path:
+            return True, f"Vídeo processado com sucesso: {output_path}"
+        return False, "Erro ao processar o vídeo"
+    except Exception as e:
+        return False, f"Erro durante o processamento do vídeo: {str(e)}"
+
+# Atualiza a função de processamento para incluir vídeos
+def processar_arquivo(filepath):
+    global arquivo_atual
+    try:
+        # Verifica se é um arquivo de vídeo
+        if filepath.lower().endswith(('.mp4', '.avi')):
+            success, message = process_video_file(filepath)
+            if not success:
+                print(f"Erro no processamento do vídeo {filepath}: {message}")
+                return False
+            return True
+        else:
+            # Processamento existente para imagens
+            return True
+    except Exception as e:
+        print(f"Erro no processamento do arquivo {filepath}: {e}")
+        return False
+    finally:
+        arquivo_atual += 1

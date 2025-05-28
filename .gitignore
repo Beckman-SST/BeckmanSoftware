@@ -56,3 +56,4 @@ venv/Lib/site-packages/jaxlib/
 venv/Lib/site-packages/torch/lib/torch_cpu.dll
 venv/Lib/site-packages/torch/lib/dnnl.lib
 venv/Lib/site-packages/jaxlib/xla_extension.pyds
+backend/config.json

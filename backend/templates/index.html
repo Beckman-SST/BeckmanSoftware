@@ -173,7 +173,7 @@
                 <p id="status-message" class="text-center">Processando arquivos...</p>
                 <p id="progress-info" class="text-center">Arquivo <span id="current-file">0</span> de <span id="total-files">0</span></p>
                 <p id="time-remaining" class="text-center">Tempo restante estimado: <span id="remaining-time">calculando...</span></p>
-                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-3">
                     <form action="{{ url_for('cancelar') }}" method="post">
                         <button type="submit" class="btn btn-danger">Cancelar Processamento</button>
                     </form>
@@ -391,12 +391,14 @@
                         uploadButton.disabled = false;
                         
                         // Recarrega a página para mostrar os novos arquivos processados
-                        if (statusContainer.style.display === 'block') {
+                        if (data.recarregar) {
                             location.reload();
                         }
                     }
                 })
-                .catch(error => console.error('Erro ao verificar status:', error));
+                .catch(error => {
+                    console.error('Erro ao verificar status:', error);
+                });
         }
         
         // Formata o tempo em segundos para formato legível
@@ -471,3 +473,51 @@
     </script>
 </body>
 </html>
+<style>
+    /* Estilos para a área de logs */
+    .log-container {
+        margin-top: 1rem;
+        padding: 0.5rem;
+    }
+    
+    #log-content {
+        max-height: 200px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        font-family: 'Consolas', monospace;
+        font-size: 0.9rem;
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+    }
+    
+    .log-entry {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #eee;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    
+    .log-entry:last-child {
+        border-bottom: none;
+    }
+    
+    /* Estiliza a barra de rolagem para navegadores WebKit */
+    #log-content::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    #log-content::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    #log-content::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    
+    #log-content::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+</style>

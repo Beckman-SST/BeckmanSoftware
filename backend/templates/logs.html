@@ -376,5 +376,55 @@
             }
         });
     </script>
+    <script>
+        // Função para atualizar os logs em tempo real
+        function updateLogs() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.logs && data.logs.length > 0) {
+                        const logsContainer = document.getElementById('logs-container');
+                        
+                        // Adiciona os novos logs no topo da lista
+                        data.logs.reverse().forEach(log => {
+                            // Verifica se o log já existe
+                            const logId = `processing_${log}`;
+                            if (!document.getElementById(logId)) {
+                                const logElement = document.createElement('div');
+                                logElement.id = logId;
+                                logElement.className = 'log-item';
+                                logElement.innerHTML = `
+                                    <div class="log-controls">
+                                        <div class="log-date">
+                                            <span class="badge bg-info text-dark me-2">INFO</span>
+                                            ${new Date().toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div class="log-content">${log}</div>
+                                `;
+                                
+                                // Insere o novo log no topo da lista
+                                if (logsContainer.firstChild) {
+                                    logsContainer.insertBefore(logElement, logsContainer.firstChild);
+                                } else {
+                                    logsContainer.appendChild(logElement);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Continua atualizando se houver processamento ativo
+                    if (data.ativo) {
+                        setTimeout(updateLogs, 1000);
+                    }
+                })
+                .catch(error => console.error('Erro ao atualizar logs:', error));
+        }
+        
+        // Inicia a atualização dos logs quando a página carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLogs();
+        });
+    </script>
 </body>
 </html>

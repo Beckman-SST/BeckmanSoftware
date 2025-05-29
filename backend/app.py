@@ -12,31 +12,32 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from PIL import Image
 import uuid
-from modules.video_processor import VideoProcessor
+from video_processor import process_video_file as process_video
 
-# Função para processar vídeo
+# Função para processar vídeo (wrapper para manter compatibilidade)
 def process_video_file(input_path):
     try:
-        processor = VideoProcessor()
-        output_path = processor.process_video(input_path, app.config['OUTPUT_FOLDER'])
-        if output_path:
-            return True, f"Vídeo processado com sucesso: {output_path}"
-        return False, "Erro ao processar o vídeo"
+        success, result = process_video(input_path, app.config['OUTPUT_FOLDER'])
+        if success:
+            return True, f"Vídeo processado com sucesso: {result}"
+        return False, result
     except Exception as e:
         return False, f"Erro durante o processamento do vídeo: {str(e)}"
 
 # Configurações da aplicação
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'beckman_project_secret_key'
-app.config['UPLOAD_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'uploads'))
-app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Output'))
-app.config['MERGE_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Merge'))
+app.config['UPLOAD_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'uploads'))
+app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'output'))
+app.config['MERGE_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'merge'))
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max
 app.config['ALLOWED_EXTENSIONS'] = {'jpg', 'jpeg', 'png', 'mp4', 'avi'}
 app.config['CONFIG_FILE'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'config.json'))
+app.config['IMAGES_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'images'))
+app.config['VIDEOS_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'videos'))
 
 # Garante que as pastas necessárias existem
-for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['MERGE_FOLDER']]:
+for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['MERGE_FOLDER'], app.config['IMAGES_FOLDER'], app.config['VIDEOS_FOLDER']]:
     try:
         os.makedirs(folder, exist_ok=True)
         print(f"Pasta criada/verificada com sucesso: {folder}")
@@ -99,7 +100,7 @@ def save_config_to_file(config):
         return False
 
 # Verifica se as pastas necessárias existem
-for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
+for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['IMAGES_FOLDER'], app.config['VIDEOS_FOLDER']]:
     try:
         os.makedirs(folder, exist_ok=True)
         if not os.path.exists(folder):
@@ -203,9 +204,10 @@ def processar_arquivos(file_paths):
                     continue
                 log_messages.append('Vídeo processado com sucesso')
             else:
-                # Processamento existente para imagens
+                # Processamento de imagens usando o módulo modular
                 log_messages.append('Iniciando processamento da imagem')
-                processo = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "processamento.py"), file_path],
+                output_folder = app.config['OUTPUT_FOLDER']
+                processo = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "modules", "processamento.py"), file_path, "-o", output_folder],
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.PIPE)
                 
@@ -518,7 +520,8 @@ def unir_imagens():
 
         # Gera um nome único para a imagem resultante
         output_filename = f'merged_{uuid.uuid4().hex[:8]}.jpg'
-        output_path = os.path.join(app.config['MERGE_FOLDER'], output_filename)
+        # Usa a pasta Merge dentro da estrutura modular
+        output_path = os.path.join(os.path.dirname(__file__), 'modules', 'data', 'merge', output_filename)
 
         # Salva a imagem resultante
         result.save(output_path, 'JPEG', quality=95)

@@ -1,12 +1,12 @@
 {
     "min_detection_confidence": 0.8,
     "min_tracking_confidence": 0.8,
-    "yolo_confidence": 0.4,
+    "yolo_confidence": 0.65,
     "moving_average_window": 5,
     "show_face_blur": true,
     "show_electronics": false,
     "show_angles": true,
-    "show_upper_body": false,
+    "show_upper_body": true,
     "show_lower_body": true,
     "process_lower_body": true,
     "resize_width": 800

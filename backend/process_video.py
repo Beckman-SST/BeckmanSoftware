@@ -1,4 +1,4 @@
-from modules.video_processor import VideoProcessor
+from modules.processors.video_processor import VideoProcessor
 import os
 
 def main():
@@ -6,8 +6,8 @@ def main():
     processor = VideoProcessor()
     
     # Define os caminhos de entrada e saída
-    input_folder = os.path.join(os.path.dirname(__file__), 'Videos')
-    output_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'Output')
+    input_folder = os.path.join(os.path.dirname(__file__), 'modules', 'data', 'videos')
+    output_folder = os.path.join(os.path.dirname(__file__), 'modules', 'data', 'output')
     
     # Lista todos os vídeos na pasta de entrada
     video_files = [f for f in os.listdir(input_folder) if f.endswith(('.mp4', '.avi', '.mov'))]

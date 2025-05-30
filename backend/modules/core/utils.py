@@ -62,9 +62,48 @@ def calculate_angle_with_vertical(a, b):
         
     return angle
 
+def prolongar_reta(p1, p2, fator=0):
+    """
+    Retorna o ponto final da reta ou prolonga a reta se fator > 0.
+    
+    Args:
+        p1 (tuple): Coordenadas do primeiro ponto (x, y)
+        p2 (tuple): Coordenadas do segundo ponto (x, y)
+        fator (int): Fator de prolongamento da reta. Se 0, retorna p2 sem prolongar.
+        
+    Returns:
+        tuple: Coordenadas do ponto final ou prolongado (x, y)
+    """
+    x1, y1 = p1
+    x2, y2 = p2
+    
+    # Se o fator for 0, apenas retorna o ponto final sem prolongar
+    if fator == 0:
+        return (int(x2), int(y2))
+    
+    # Calcula o vetor diretor da reta
+    dx = x2 - x1
+    dy = y2 - y1
+    
+    # Normaliza o vetor diretor
+    comprimento = math.sqrt(dx**2 + dy**2)
+    if comprimento > 0:
+        dx = dx / comprimento
+        dy = dy / comprimento
+    
+    # Prolonga a reta pelo fator especificado
+    x_prolongado = int(x2 + dx * fator)
+    y_prolongado = int(y2 + dy * fator)
+    
+    return (x_prolongado, y_prolongado)
+
+# Dicionário global para armazenar as posições dos textos já desenhados no frame atual
+_text_positions = {}
+
 def adjust_text_position(frame, text, position, font, font_scale, color, thickness):
     """
-    Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame.
+    Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame
+    e não sobreponha outros textos já desenhados.
     
     Args:
         frame (numpy.ndarray): Frame onde o texto será desenhado
@@ -78,21 +117,67 @@ def adjust_text_position(frame, text, position, font, font_scale, color, thickne
     Returns:
         tuple: Posição ajustada do texto (x, y)
     """
+    global _text_positions
+    
+    # Limpa o dicionário de posições se o frame mudou (verificando a soma dos pixels)
+    frame_id = hash(str(frame.shape) + str(np.sum(frame[::50, ::50])))
+    if not hasattr(adjust_text_position, "last_frame_id") or adjust_text_position.last_frame_id != frame_id:
+        _text_positions = {}
+        adjust_text_position.last_frame_id = frame_id
+    
     text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+    text_w, text_h = text_size
     text_x, text_y = position
     
+    # Margem adicional ao redor do texto para evitar sobreposição
+    margin = 15
+    
     # Ajusta a posição horizontal para garantir que o texto fique dentro do frame
-    if text_x + text_size[0] > frame.shape[1]:
-        text_x = frame.shape[1] - text_size[0] - 10
+    if text_x + text_w > frame.shape[1]:
+        text_x = frame.shape[1] - text_w - margin
     if text_x < 0:
-        text_x = 10
+        text_x = margin
         
     # Ajusta a posição vertical para garantir que o texto fique dentro do frame
-    if text_y - text_size[1] < 0:
-        text_y = text_size[1] + 10
+    if text_y - text_h < 0:
+        text_y = text_h + margin
     if text_y > frame.shape[0]:
-        text_y = frame.shape[0] - 10
+        text_y = frame.shape[0] - margin
+    
+    # Verifica se a posição atual colide com algum texto já desenhado
+    # e ajusta a posição vertical se necessário
+    rect = (text_x - margin, text_y - text_h - margin, text_x + text_w + margin, text_y + margin)
+    
+    # Tenta encontrar uma posição que não colida com outros textos
+    attempts = 0
+    max_attempts = 10  # Limite de tentativas para evitar loop infinito
+    
+    while attempts < max_attempts:
+        collision = False
         
+        for existing_rect in _text_positions.values():
+            # Verifica se há colisão entre os retângulos
+            if (rect[0] < existing_rect[2] and rect[2] > existing_rect[0] and
+                rect[1] < existing_rect[3] and rect[3] > existing_rect[1]):
+                collision = True
+                # Move o texto para baixo
+                text_y += text_h + margin * 2
+                # Atualiza o retângulo
+                rect = (text_x - margin, text_y - text_h - margin, text_x + text_w + margin, text_y + margin)
+                break
+        
+        if not collision or text_y > frame.shape[0] - margin:
+            break
+            
+        attempts += 1
+    
+    # Se ainda estiver fora dos limites do frame após ajustes, força dentro dos limites
+    if text_y > frame.shape[0] - margin:
+        text_y = frame.shape[0] - margin
+    
+    # Armazena a posição final do texto
+    _text_positions[text] = rect
+    
     return (text_x, text_y)
 
 def get_timestamp():

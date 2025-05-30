@@ -308,7 +308,26 @@ class PoseVisualizer:
             frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness
         )
         
-        # Desenha o texto
+        # Obtém o tamanho do texto para criar o retângulo de fundo
+        text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        text_w, text_h = text_size
+        
+        # Adiciona um fundo semi-transparente para destacar o texto
+        # Coordenadas do retângulo (x1, y1) é o canto superior esquerdo e (x2, y2) é o canto inferior direito
+        x1 = position[0] - 5  # 5 pixels de margem à esquerda
+        y1 = position[1] - text_h - 5  # 5 pixels de margem acima
+        x2 = position[0] + text_w + 5  # 5 pixels de margem à direita
+        y2 = position[1] + 5  # 5 pixels de margem abaixo
+        
+        # Cria uma cópia do frame para aplicar o retângulo semi-transparente
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), -1)  # Retângulo preto preenchido
+        
+        # Aplica o retângulo com transparência
+        alpha = 0.6  # Nível de transparência (0 = transparente, 1 = opaco)
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+        
+        # Desenha o texto sobre o retângulo
         cv2.putText(
             frame,
             text,

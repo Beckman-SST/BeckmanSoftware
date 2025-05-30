@@ -136,6 +136,92 @@ class PoseDetector:
         Returns:
             bool: True se deve processar a parte inferior do corpo, False caso contrário
         """
+        # Se o processamento da parte inferior estiver desativado nas configurações, retorna False imediatamente
+        # Nota: Esta verificação será feita no image_processor.py
+        
+        # Verifica a visibilidade dos landmarks inferiores usando os valores de visibilidade do MediaPipe
+        try:
+            # Obtém os resultados originais do MediaPipe para acessar os valores de visibilidade
+            # Como recebemos landmarks já processados, precisamos acessar os dados originais
+            # Por isso, vamos modificar para receber os resultados originais
+            return self._check_lower_body_visibility(landmarks)
+        except Exception as e:
+            # Em caso de erro, usa a lógica de fallback baseada na presença dos landmarks
+            return self._fallback_lower_body_check(landmarks)
+    
+    def _check_lower_body_visibility(self, results):
+        """
+        Verifica a visibilidade dos landmarks usando os valores de visibilidade do MediaPipe.
+        
+        Args:
+            results: Resultados originais do MediaPipe
+            
+        Returns:
+            bool: True se deve processar a parte inferior do corpo
+        """
+        if not hasattr(results, 'pose_landmarks') or not results.pose_landmarks:
+            return False
+            
+        landmarks = results.pose_landmarks.landmark
+        
+        # Verifica a visibilidade dos landmarks inferiores
+        right_ankle_visibility = landmarks[self.mp_holistic.PoseLandmark.RIGHT_ANKLE.value].visibility
+        left_ankle_visibility = landmarks[self.mp_holistic.PoseLandmark.LEFT_ANKLE.value].visibility
+        ankle_visibility = max(right_ankle_visibility, left_ankle_visibility)  # Pega a maior visibilidade entre os tornozelos
+        
+        right_knee_visibility = landmarks[self.mp_holistic.PoseLandmark.RIGHT_KNEE.value].visibility
+        left_knee_visibility = landmarks[self.mp_holistic.PoseLandmark.LEFT_KNEE.value].visibility
+        knee_visibility = max(right_knee_visibility, left_knee_visibility)  # Pega a maior visibilidade entre os joelhos
+        
+        right_foot_visibility = landmarks[self.mp_holistic.PoseLandmark.RIGHT_FOOT_INDEX.value].visibility
+        left_foot_visibility = landmarks[self.mp_holistic.PoseLandmark.LEFT_FOOT_INDEX.value].visibility
+        foot_visibility = max(right_foot_visibility, left_foot_visibility)  # Pega a maior visibilidade entre os pés
+        
+        # Verifica a visibilidade dos landmarks superiores
+        right_shoulder_visibility = landmarks[self.mp_holistic.PoseLandmark.RIGHT_SHOULDER.value].visibility
+        left_shoulder_visibility = landmarks[self.mp_holistic.PoseLandmark.LEFT_SHOULDER.value].visibility
+        shoulder_visibility = max(right_shoulder_visibility, left_shoulder_visibility)  # Pega a maior visibilidade entre os ombros
+        
+        right_elbow_visibility = landmarks[self.mp_holistic.PoseLandmark.RIGHT_ELBOW.value].visibility
+        left_elbow_visibility = landmarks[self.mp_holistic.PoseLandmark.LEFT_ELBOW.value].visibility
+        elbow_visibility = max(right_elbow_visibility, left_elbow_visibility)  # Pega a maior visibilidade entre os cotovelos
+        
+        right_wrist_visibility = landmarks[self.mp_holistic.PoseLandmark.RIGHT_WRIST.value].visibility
+        left_wrist_visibility = landmarks[self.mp_holistic.PoseLandmark.LEFT_WRIST.value].visibility
+        wrist_visibility = max(right_wrist_visibility, left_wrist_visibility)  # Pega a maior visibilidade entre os pulsos
+        
+        # Calcula a visibilidade média dos pontos inferiores e superiores
+        lower_visibility_avg = (knee_visibility + ankle_visibility + foot_visibility) / 3
+        upper_visibility_avg = (shoulder_visibility + elbow_visibility + wrist_visibility) / 3
+        
+        # Se a visibilidade do tornozelo ou pé for 0, trata como "imagem de perfil" ou foco na parte superior (retorna False)
+        # Isso impede que o código tente processar a parte inferior se ela não estiver presente ou visível.
+        if ankle_visibility == 0 or foot_visibility == 0:
+            return False
+            
+        # Verifica se os landmarks inferiores têm visibilidade alta
+        # Garante que os três pontos principais da perna (joelho, tornozelo, pé) tenham visibilidade individualmente > 0.5
+        lower_landmarks_visible = all(v > 0.5 for v in [knee_visibility, ankle_visibility, foot_visibility])
+        
+        # Compara a visibilidade dos landmarks inferiores com os superiores
+        # Condição 1: Visibilidade média da parte inferior > 80% da visibilidade média da parte superior
+        # OU
+        # Condição 2: Visibilidade média da parte inferior é MUITO alta (ex: > 0.8) em geral, independente da superior
+        if lower_landmarks_visible and (lower_visibility_avg > upper_visibility_avg * 0.8 or lower_visibility_avg > 0.8):
+            return True
+            
+        return False
+    
+    def _fallback_lower_body_check(self, landmarks):
+        """
+        Lógica de fallback para verificar se deve processar a parte inferior do corpo.
+        
+        Args:
+            landmarks (dict): Dicionário com as coordenadas dos landmarks
+            
+        Returns:
+            bool: True se deve processar a parte inferior do corpo
+        """
         # IDs dos landmarks inferiores (joelho, tornozelo, pé)
         lower_landmarks_ids = [25, 26, 27, 28, 31, 32]  # Joelhos, tornozelos, pés
         
@@ -158,8 +244,6 @@ class PoseDetector:
             return False
         
         # Compara a visibilidade dos landmarks inferiores com os superiores
-        # Se os landmarks inferiores têm visibilidade significativamente maior que os superiores
-        # ou se os landmarks inferiores têm visibilidade muito alta em geral, processa como parte inferior
         if lower_landmarks_visible >= 4 and (lower_visibility_avg > upper_visibility_avg * 0.8 or lower_visibility_avg > 0.8):
             return True
         

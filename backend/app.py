@@ -274,8 +274,11 @@ def index():
     error_messages.clear()
     
     if os.path.exists(app.config['OUTPUT_FOLDER']):
+        # Filtra apenas arquivos de imagem e vídeo, excluindo arquivos como __init__.py
+        valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.mp4', '.avi', '.mov', '.mkv')
         all_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER']) 
-                    if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f))]
+                    if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f)) 
+                    and f.lower().endswith(valid_extensions)]
         
         # Separa os arquivos de erro dos arquivos processados normalmente
         for f in all_files:
@@ -391,9 +394,12 @@ def status():
     
     # Verifica arquivos já processados na pasta Output
     if os.path.exists(app.config['OUTPUT_FOLDER']):
+        # Filtra apenas arquivos de imagem e vídeo
+        valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.mp4', '.avi', '.mov', '.mkv')
         status_info['arquivos_processados'] = [
             f for f in os.listdir(app.config['OUTPUT_FOLDER'])
             if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f))
+            and f.lower().endswith(valid_extensions)
         ]
     
     if processamento_ativo and arquivo_atual > 0:
@@ -465,9 +471,12 @@ def abrir_pasta_merge():
 def relatorio():
     processed_files = []
     if os.path.exists(app.config['OUTPUT_FOLDER']):
+        # Filtra apenas arquivos de imagem e vídeo, excluindo arquivos de erro
+        valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.mp4', '.avi', '.mov', '.mkv')
         processed_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER']) 
                         if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f)) 
-                        and not f.startswith('error_')]
+                        and not f.startswith('error_')
+                        and f.lower().endswith(valid_extensions)]
     return render_template('relatorio.html', processed_files=processed_files)
 
 # Rota para unir imagens selecionadas
@@ -751,8 +760,19 @@ if __name__ == '__main__':
     print(f'Interface web disponível em:')
     print(f' * Local:   http://localhost:{port}')
     print(f' * Rede:    http://{host}:{port}')
+    print('Hot reload ativado - O servidor reiniciará automaticamente quando você modificar o código')
     print('='*50 + '\n')
-    app.run(debug=True, host=host, port=port)
+    
+    # Configuração completa para desenvolvimento com hot reload
+    app.run(
+        debug=True,           # Ativa o modo debug
+        host=host,            # Permite acesso externo
+        port=port,            # Porta do servidor
+        use_reloader=True,    # Ativa o hot reload automático
+        use_debugger=True,    # Ativa o debugger interativo
+        threaded=True,        # Permite múltiplas requisições simultâneas
+        extra_files=None      # Monitora arquivos adicionais (None = todos os .py)
+    )
 
 # Função para processar vídeo
 def process_video_file(input_path):

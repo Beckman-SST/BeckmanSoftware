@@ -73,7 +73,7 @@ class VideoProcessor:
                     break
                 
                 # Processa o frame
-                processed_frame = self._process_frame(frame)
+                processed_frame = self._process_frame(frame, video_path, output_folder, frame_count)
                 
                 # Escreve o frame processado no vídeo de saída
                 out.write(processed_frame)
@@ -256,12 +256,15 @@ class VideoProcessor:
             if 'out' in locals() and out is not None:
                 out.release()
     
-    def _process_frame(self, frame):
+    def _process_frame(self, frame, video_path=None, output_folder=None, frame_idx=0):
         """
         Processa um frame usando o processador de imagens.
         
         Args:
             frame (numpy.ndarray): Frame a ser processado
+            video_path (str, optional): Caminho do vídeo original (para salvamento de erro)
+            output_folder (str, optional): Pasta de saída (para salvamento de erro)
+            frame_idx (int): Índice do frame
             
         Returns:
             numpy.ndarray: Frame processado
@@ -273,7 +276,7 @@ class VideoProcessor:
             frame = cv2.resize(frame, (resize_width, int(frame.shape[0] * scale)))
         
         # Usa o processador de imagens para processar o frame
-        return self.image_processor._process_frame(frame)
+        return self.image_processor._process_frame(frame, video_path, output_folder, frame_idx)
     
     def _process_frame_file(self, frame_path):
         """
@@ -289,7 +292,7 @@ class VideoProcessor:
         frame = cv2.imread(frame_path)
         
         # Processa o frame
-        processed_frame = self._process_frame(frame)
+        processed_frame = self._process_frame(frame, frame_path, os.path.dirname(frame_path), 0)
         
         # Salva o frame processado
         cv2.imwrite(frame_path, processed_frame)

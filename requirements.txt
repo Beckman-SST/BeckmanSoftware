@@ -8,7 +8,7 @@ opencv-python==4.6.0.66
 # MediaPipe e dependências
 protobuf==3.20.3
 tensorflow==2.9.3
-mediapipe==0.9.3.0
+mediapipe==0.10.21
 
 # Flask e dependências
 Flask==2.2.5

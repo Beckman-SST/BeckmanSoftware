@@ -57,3 +57,16 @@ venv/Lib/site-packages/torch/lib/torch_cpu.dll
 venv/Lib/site-packages/torch/lib/dnnl.lib
 venv/Lib/site-packages/jaxlib/xla_extension.pyds
 backend/config.json
+
+# Requested by user: ignore files within specific backend/modules/data/ subdirectories
+# These rules target files inside these folders, allowing the folders themselves (and .gitkeep files) to be tracked.
+backend/modules/data/images/*
+!backend/modules/data/images/.gitkeep
+backend/modules/data/merge/*
+!backend/modules/data/merge/.gitkeep
+backend/modules/data/output/*
+!backend/modules/data/output/.gitkeep
+backend/modules/data/uploads/*
+!backend/modules/data/uploads/.gitkeep
+backend/modules/data/videos/*
+!backend/modules/data/videos/.gitkeep

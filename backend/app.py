@@ -12,12 +12,14 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 from PIL import Image
 import uuid
-from video_processor import process_video_file as process_video
+from modules.processors.video_processor import VideoProcessor
 
 # Função para processar vídeo (wrapper para manter compatibilidade)
 def process_video_file(input_path):
     try:
-        success, result = process_video(input_path, app.config['OUTPUT_FOLDER'])
+        config = load_config()
+        processor = VideoProcessor(config)
+        success, result = processor.process_video(input_path, app.config['OUTPUT_FOLDER'])
         if success:
             return True, f"Vídeo processado com sucesso: {result}"
         return False, result
@@ -195,8 +197,9 @@ def processar_arquivos(file_paths):
         
         try:
             # Verifica se é um arquivo de vídeo
-            if file_path.lower().endswith(('.mp4', '.avi')):
-                log_messages.append(f'Iniciando processamento do vídeo')
+            if file_path.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
+                log_messages.append('Iniciando processamento do vídeo')
+                # Apenas detecção, desenho dos landmarks e salvamento do vídeo
                 success, message = process_video_file(file_path)
                 if not success:
                     log_messages.append(f'Erro no processamento: {message}')
@@ -805,3 +808,25 @@ def processar_arquivo(filepath):
         return False
     finally:
         arquivo_atual += 1
+
+def process_all_videos():
+    """
+    Process all videos in the VIDEOS_FOLDER and save results to OUTPUT_FOLDER.
+    """
+    from modules.processors.video_processor import VideoProcessor
+    input_folder = app.config['VIDEOS_FOLDER']
+    output_folder = app.config['OUTPUT_FOLDER']
+    config = load_config()
+    processor = VideoProcessor(config)
+    video_files = [f for f in os.listdir(input_folder) if f.endswith(('.mp4', '.avi', '.mov'))]
+    if not video_files:
+        print("Nenhum vídeo encontrado na pasta de entrada.")
+        return
+    for video_file in video_files:
+        input_path = os.path.join(input_folder, video_file)
+        print(f"\nProcessando vídeo: {video_file}")
+        success, output_path = processor.process_video(input_path, output_folder)
+        if success:
+            print(f"Processamento concluído com sucesso!")
+        else:
+            print(f"Erro ao processar o vídeo {video_file}: {output_path}")

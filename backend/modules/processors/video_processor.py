@@ -2,9 +2,9 @@ import cv2
 import os
 import time
 import numpy as np
+import mediapipe as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..core.utils import ensure_directory_exists, get_timestamp
-from .image_processor import ImageProcessor
 
 class VideoProcessor:
     def __init__(self, config):
@@ -15,7 +15,16 @@ class VideoProcessor:
             config (dict): Configurações para o processamento
         """
         self.config = config
-        self.image_processor = ImageProcessor(config)
+        # Inicializa MediaPipe para detecção de pose
+        self.mp_pose = mp.solutions.pose
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.pose = self.mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,
+            enable_segmentation=False,
+            min_detection_confidence=config.get('min_detection_confidence', 0.5),
+            min_tracking_confidence=config.get('min_tracking_confidence', 0.5)
+        )
     
     def process_video(self, video_path, output_folder, progress_callback=None):
         """
@@ -258,7 +267,7 @@ class VideoProcessor:
     
     def _process_frame(self, frame, video_path=None, output_folder=None, frame_idx=0):
         """
-        Processa um frame usando o processador de imagens.
+        Processa um frame detectando pose e desenhando landmarks básicos.
         
         Args:
             frame (numpy.ndarray): Frame a ser processado
@@ -269,14 +278,34 @@ class VideoProcessor:
         Returns:
             numpy.ndarray: Frame processado
         """
-        # Redimensiona o frame se necessário
-        resize_width = self.config.get('resize_width')
-        if resize_width and resize_width > 0 and frame.shape[1] > resize_width:
-            scale = resize_width / frame.shape[1]
-            frame = cv2.resize(frame, (resize_width, int(frame.shape[0] * scale)))
-        
-        # Usa o processador de imagens para processar o frame
-        return self.image_processor._process_frame(frame, video_path, output_folder, frame_idx)
+        try:
+            # Redimensiona o frame se necessário
+            resize_width = self.config.get('resize_width')
+            if resize_width and resize_width > 0 and frame.shape[1] > resize_width:
+                scale = resize_width / frame.shape[1]
+                frame = cv2.resize(frame, (resize_width, int(frame.shape[0] * scale)))
+            
+            # Converte BGR para RGB para o MediaPipe
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Processa o frame com MediaPipe
+            results = self.pose.process(rgb_frame)
+            
+            # Desenha os landmarks se detectados
+            if results.pose_landmarks:
+                self.mp_drawing.draw_landmarks(
+                    frame,
+                    results.pose_landmarks,
+                    self.mp_pose.POSE_CONNECTIONS,
+                    self.mp_drawing.DrawingSpec(color=(255, 255, 0), thickness=2, circle_radius=2),
+                    self.mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=2)
+                )
+            
+            return frame
+            
+        except Exception as e:
+            print(f"Erro ao processar frame {frame_idx}: {str(e)}")
+            return frame  # Retorna o frame original em caso de erro
     
     def _process_frame_file(self, frame_path):
         """
@@ -303,4 +332,5 @@ class VideoProcessor:
         """
         Libera os recursos do processador.
         """
-        self.image_processor.release()
+        if hasattr(self, 'pose') and self.pose:
+            self.pose.close()

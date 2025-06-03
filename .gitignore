@@ -31,20 +31,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Arquivos específicos do projeto
-/uploads/*
-!/uploads/.gitkeep
-/backend/uploads/*
-!/backend/uploads/.gitkeep
-/Output/*
-!/Output/.gitkeep
-/Merge/*
-!/Merge/.gitkeep
-/backend/Videos/*
-!/backend/Videos/.gitkeep
-/data/videos/*
-!/data/videos/.gitkeep
-
 # Arquivos de modelo e pesos
 *.pt
 *.weights
@@ -56,17 +42,23 @@ venv/Lib/site-packages/jaxlib/
 venv/Lib/site-packages/torch/lib/torch_cpu.dll
 venv/Lib/site-packages/torch/lib/dnnl.lib
 venv/Lib/site-packages/jaxlib/xla_extension.pyds
+
+# Configuração do backend
 backend/config.json
 
-# Requested by user: ignore files within specific backend/modules/data/ subdirectories
-# These rules target files inside these folders, allowing the folders themselves (and .gitkeep files) to be tracked.
+# Pastas de dados do projeto - permite as pastas mas ignora o conteúdo
 backend/modules/data/images/*
 !backend/modules/data/images/.gitkeep
+!backend/modules/data/images/__init__.py
 backend/modules/data/merge/*
 !backend/modules/data/merge/.gitkeep
+!backend/modules/data/merge/__init__.py
 backend/modules/data/output/*
 !backend/modules/data/output/.gitkeep
+!backend/modules/data/output/__init__.py
 backend/modules/data/uploads/*
 !backend/modules/data/uploads/.gitkeep
+!backend/modules/data/uploads/__init__.py
 backend/modules/data/videos/*
 !backend/modules/data/videos/.gitkeep
+!backend/modules/data/videos/__init__.py

@@ -5,6 +5,8 @@ import numpy as np
 import mediapipe as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..core.utils import ensure_directory_exists, get_timestamp
+from ..detection.pose_detector import PoseDetector
+from ..visualization.video_visualizer import VideoVisualizer
 
 class VideoProcessor:
     def __init__(self, config):
@@ -25,6 +27,15 @@ class VideoProcessor:
             min_detection_confidence=config.get('min_detection_confidence', 0.5),
             min_tracking_confidence=config.get('min_tracking_confidence', 0.5)
         )
+        
+        # Inicializa detector de pose com landmarks faciais
+        self.pose_detector = PoseDetector(
+            min_detection_confidence=config.get('min_detection_confidence', 0.5),
+            min_tracking_confidence=config.get('min_tracking_confidence', 0.5)
+        )
+        
+        # Inicializa visualizador específico para vídeos
+        self.video_visualizer = VideoVisualizer()  # Usa tamanho padrão (200px) similar ao processamento de imagens
     
     def process_video(self, video_path, output_folder, progress_callback=None):
         """
@@ -267,7 +278,7 @@ class VideoProcessor:
     
     def _process_frame(self, frame, video_path=None, output_folder=None, frame_idx=0):
         """
-        Processa um frame detectando pose e desenhando landmarks básicos.
+        Processa um frame detectando pose, landmarks faciais e aplicando tarja no rosto.
         
         Args:
             frame (numpy.ndarray): Frame a ser processado
@@ -276,7 +287,7 @@ class VideoProcessor:
             frame_idx (int): Índice do frame
             
         Returns:
-            numpy.ndarray: Frame processado
+            numpy.ndarray: Frame processado com tarja no rosto
         """
         try:
             # Redimensiona o frame se necessário
@@ -285,14 +296,38 @@ class VideoProcessor:
                 scale = resize_width / frame.shape[1]
                 frame = cv2.resize(frame, (resize_width, int(frame.shape[0] * scale)))
             
-            # Converte BGR para RGB para o MediaPipe
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Obtém dimensões do frame
+            height, width, _ = frame.shape
             
-            # Processa o frame com MediaPipe
-            results = self.pose.process(rgb_frame)
+            # Processa o frame com o detector de pose (inclui detecção facial)
+            rgb_frame, results = self.pose_detector.detect(frame)
             
-            # Desenha os landmarks se detectados
-            if results.pose_landmarks:
+            # Obtém todos os landmarks para uso posterior
+            pose_landmarks = self.pose_detector.get_all_landmarks(results, width, height)
+            
+            # Aplica tarja no rosto se habilitado na configuração
+            if self.config.get('show_face_blur', True):
+                # Obtém landmarks faciais com múltiplos fallbacks
+                face_landmarks = self._get_face_landmarks_with_fallback(results, width, height, pose_landmarks)
+                
+                # Aplica a tarja usando os melhores landmarks disponíveis
+                frame = self.video_visualizer.apply_face_blur(
+                    frame, 
+                    face_landmarks=face_landmarks.get('face_mesh') if face_landmarks else None,
+                    eye_landmarks=face_landmarks.get('pose_eyes') if face_landmarks else pose_landmarks
+                )
+            
+            # Desenha os landmarks do corpo usando o visualizador específico para vídeos
+            if self.config.get('show_upper_body', True) or self.config.get('show_lower_body', True):
+                frame = self.video_visualizer.draw_video_landmarks(
+                    frame,
+                    results,
+                    show_upper_body=self.config.get('show_upper_body', True),
+                    show_lower_body=self.config.get('show_lower_body', True)
+                )
+            
+            # Desenha landmarks de pose básicos se habilitado (modo debug)
+            if self.config.get('show_pose_landmarks', False) and results.pose_landmarks:
                 self.mp_drawing.draw_landmarks(
                     frame,
                     results.pose_landmarks,
@@ -306,6 +341,62 @@ class VideoProcessor:
         except Exception as e:
             print(f"Erro ao processar frame {frame_idx}: {str(e)}")
             return frame  # Retorna o frame original em caso de erro
+    
+    def _get_face_landmarks_with_fallback(self, results, width, height, pose_landmarks):
+        """
+        Obtém landmarks faciais com múltiplos fallbacks para melhor detecção.
+        
+        Args:
+            results: Resultados do MediaPipe
+            width (int): Largura da imagem
+            height (int): Altura da imagem
+            pose_landmarks (dict): Landmarks da pose
+            
+        Returns:
+            dict: Dicionário com diferentes tipos de landmarks faciais disponíveis
+        """
+        face_data = {}
+        
+        try:
+            # Prioridade 1: Face mesh completo (mais preciso)
+            if hasattr(results, 'face_landmarks') and results.face_landmarks:
+                face_landmarks = self.pose_detector.get_face_landmarks(results, width, height)
+                if face_landmarks and len(face_landmarks) > 10:  # Mínimo de landmarks para ser confiável
+                    face_data['face_mesh'] = face_landmarks
+            
+            # Prioridade 2: Landmarks dos olhos da pose (fallback confiável)
+            if pose_landmarks:
+                eye_landmarks = {}
+                # Olho esquerdo (ID 2) e direito (ID 5) da pose
+                if 2 in pose_landmarks:  # LEFT_EYE
+                    eye_landmarks[2] = pose_landmarks[2]
+                if 5 in pose_landmarks:  # RIGHT_EYE
+                    eye_landmarks[5] = pose_landmarks[5]
+                
+                # Adiciona landmarks adicionais da face se disponíveis
+                face_ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # IDs dos landmarks faciais da pose
+                for face_id in face_ids:
+                    if face_id in pose_landmarks:
+                        eye_landmarks[face_id] = pose_landmarks[face_id]
+                
+                if eye_landmarks:
+                    face_data['pose_eyes'] = eye_landmarks
+            
+            # Prioridade 3: Estimativa baseada em landmarks do nariz e boca
+            if pose_landmarks and not face_data:
+                estimated_face = {}
+                if 0 in pose_landmarks:  # NOSE
+                    nose_pos = pose_landmarks[0]
+                    # Estima posição dos olhos baseado no nariz
+                    estimated_face[2] = (nose_pos[0] - 30, nose_pos[1] - 20)  # Olho esquerdo estimado
+                    estimated_face[5] = (nose_pos[0] + 30, nose_pos[1] - 20)  # Olho direito estimado
+                    face_data['estimated'] = estimated_face
+            
+            return face_data if face_data else None
+            
+        except Exception as e:
+            print(f"Erro ao obter landmarks faciais: {str(e)}")
+            return None
     
     def _process_frame_file(self, frame_path):
         """
@@ -334,3 +425,5 @@ class VideoProcessor:
         """
         if hasattr(self, 'pose') and self.pose:
             self.pose.close()
+        if hasattr(self, 'pose_detector') and self.pose_detector:
+            self.pose_detector.release()

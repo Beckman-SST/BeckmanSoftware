@@ -303,6 +303,10 @@ class PoseVisualizer:
         else:
             text = f"{angle:.2f} graus"
         
+        # Desloca a posição do texto para a direita do ponto da articulação para evitar sobreposição
+        offset_x = 20  # Deslocamento horizontal em pixels
+        position = (position[0] + offset_x, position[1])
+        
         # Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame
         position = adjust_text_position(
             frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness

@@ -22,20 +22,24 @@ class VideoProcessor:
         self.mp_drawing = mp.solutions.drawing_utils
         self.pose = self.mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=1,
-            enable_segmentation=False,
-            min_detection_confidence=config.get('min_detection_confidence', 0.5),
-            min_tracking_confidence=config.get('min_tracking_confidence', 0.5)
+            model_complexity=2,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
         )
         
         # Inicializa detector de pose com landmarks faciais
         self.pose_detector = PoseDetector(
-            min_detection_confidence=config.get('min_detection_confidence', 0.5),
-            min_tracking_confidence=config.get('min_tracking_confidence', 0.5)
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+            moving_average_window=3
         )
         
-        # Inicializa visualizador específico para vídeos
-        self.video_visualizer = VideoVisualizer()  # Usa tamanho padrão (200px) similar ao processamento de imagens
+        # Inicializa o analisador de ângulos
+        from ..analysis.angle_analyzer import AngleAnalyzer
+        self.angle_analyzer = AngleAnalyzer()
+        
+        # Inicializa o visualizador específico para vídeos
+        self.video_visualizer = VideoVisualizer(tarja_ratio=0.20)
     
     def process_video(self, video_path, output_folder, progress_callback=None):
         """
@@ -325,7 +329,32 @@ class VideoProcessor:
                     show_upper_body=self.config.get('show_upper_body', True),
                     show_lower_body=self.config.get('show_lower_body', True)
                 )
-            
+                
+                # Calcula e desenha o ângulo do pescoço se a opção estiver habilitada
+                if self.config.get('show_angles', True) and self.config.get('show_upper_body', True):
+                    # Calcula e desenha o ângulo do braço superior (ombro) para ambos os lados
+                    # Verifica se temos landmarks suficientes para calcular o ângulo do ombro direito
+                    right_shoulder_landmarks_available = all(lm_id in pose_landmarks for lm_id in [12, 14, 11])
+                    
+                    if right_shoulder_landmarks_available:
+                        # Desenha o ângulo do ombro direito
+                        frame, right_shoulder_angle, right_shoulder_score = self.video_visualizer.draw_shoulder_angle(
+                            frame,
+                            pose_landmarks,
+                            side='right'
+                        )
+                    
+                    # Verifica se temos landmarks suficientes para calcular o ângulo do ombro esquerdo
+                    left_shoulder_landmarks_available = all(lm_id in pose_landmarks for lm_id in [11, 13, 12])
+                    
+                    if left_shoulder_landmarks_available:
+                        # Desenha o ângulo do ombro esquerdo
+                        frame, left_shoulder_angle, left_shoulder_score = self.video_visualizer.draw_shoulder_angle(
+                            frame,
+                            pose_landmarks,
+                            side='left'
+                        )
+                    
             # Desenha landmarks de pose básicos se habilitado (modo debug)
             if self.config.get('show_pose_landmarks', False) and results.pose_landmarks:
                 self.mp_drawing.draw_landmarks(
@@ -335,6 +364,21 @@ class VideoProcessor:
                     self.mp_drawing.DrawingSpec(color=(255, 255, 0), thickness=2, circle_radius=2),
                     self.mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=2)
                 )
+                    
+            # A visualização do ângulo do pescoço foi removida
+            
+            # Calcula e desenha o ângulo da coluna vertebral se a opção estiver habilitada
+            if self.config.get('show_angles', True) and self.config.get('show_upper_body', True) and self.config.get('show_lower_body', True):
+                # Verifica se temos landmarks suficientes para calcular o ângulo da coluna
+                spine_landmarks_available = all(lm_id in pose_landmarks for lm_id in [11, 12, 23, 24])
+                
+                if spine_landmarks_available:
+                    # Desenha o ângulo da coluna (usa referência vertical por padrão)
+                    frame, spine_angle = self.video_visualizer.draw_spine_angle(
+                        frame,
+                        pose_landmarks,
+                        use_vertical_reference=True
+                    )
             
             return frame
             

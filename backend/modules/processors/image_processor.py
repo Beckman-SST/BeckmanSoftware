@@ -201,18 +201,6 @@ class ImageProcessor:
             else:
                 knee_id, ankle_id = 25, 27
             
-            if knee_id in landmarks and knee_angle is not None:
-                knee_position = landmarks[knee_id]
-                frame_clean = self.visualizer.draw_angle(
-                    frame_clean, knee_angle, knee_position, "", color=(0, 255, 255)  # Amarelo
-                )
-            
-            if ankle_id in landmarks and ankle_angle is not None:
-                ankle_position = landmarks[ankle_id]
-                frame_clean = self.visualizer.draw_angle(
-                    frame_clean, ankle_angle, ankle_position, "", color=(0, 255, 255)  # Amarelo
-                )
-        
         # Define conexões personalizadas para a perna selecionada
         import mediapipe as mp
         mp_drawing = mp.solutions.drawing_utils
@@ -238,6 +226,19 @@ class ImageProcessor:
             mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=4, circle_radius=4),
             mp_drawing.DrawingSpec(color=(214, 121, 108), thickness=4, circle_radius=4)
         )
+            
+        # Desenha os ângulos por último para garantir que fiquem visíveis por cima dos landmarks
+        if knee_id in landmarks and knee_angle is not None:
+            knee_position = landmarks[knee_id]
+            frame_clean = self.visualizer.draw_angle(
+                frame_clean, knee_angle, knee_position, "", color=(0, 255, 255)  # Amarelo
+            )
+        
+        if ankle_id in landmarks and ankle_angle is not None:
+            ankle_position = landmarks[ankle_id]
+            frame_clean = self.visualizer.draw_angle(
+                frame_clean, ankle_angle, ankle_position, "", color=(0, 255, 255)  # Amarelo
+            )
         
         # Corta a imagem acima da cintura para mostrar apenas a parte inferior
         # Usa os landmarks do quadril (hip) do MediaPipe para determinar a posição da cintura
@@ -335,9 +336,10 @@ class ImageProcessor:
         
         # Processa o corpo superior se a opção estiver habilitada
         if self.config.get('show_upper_body', True):
-            # Calcula os ângulos do cotovelo e pulso
+            # Calcula os ângulos do cotovelo, pulso e pescoço para o lado mais visível
             elbow_angle = self.angle_analyzer.calculate_elbow_angle(landmarks, side)
             wrist_angle = self.angle_analyzer.calculate_wrist_angle(landmarks, side)
+            # O cálculo do ângulo do pescoço foi removido
             
             # Calcula o ângulo entre os olhos e o dispositivo eletrônico mais próximo
             # Sempre calcula os ângulos dos olhos, independente da configuração SHOW_ELECTRONICS
@@ -398,7 +400,9 @@ class ImageProcessor:
                     landmarks, device_center
                 )
             
-            # Desenha os ângulos se a opção estiver habilitada
+            # Prepara as informações dos ângulos para desenhar depois
+            angle_info = []
+            
             if self.config.get('show_angles', True):
                 # Posições para os textos dos ângulos
                 if side == 'right':
@@ -406,19 +410,29 @@ class ImageProcessor:
                 else:
                     elbow_id, wrist_id = 13, 15
                 
+                # Coleta informações do ângulo do cotovelo
                 if elbow_id in landmarks and elbow_angle is not None:
                     elbow_position = landmarks[elbow_id]
-                    frame_clean = self.visualizer.draw_angle(
-                        frame_clean, elbow_angle, elbow_position, "", color=(0, 255, 255)  # Amarelo
-                    )
+                    angle_info.append({
+                        'angle': elbow_angle,
+                        'position': elbow_position,
+                        'label': "",
+                        'color': (0, 255, 255)  # Amarelo
+                    })
                 
+                # Coleta informações do ângulo do pulso
                 if wrist_id in landmarks and wrist_angle is not None:
                     wrist_position = landmarks[wrist_id]
-                    frame_clean = self.visualizer.draw_angle(
-                        frame_clean, wrist_angle, wrist_position, "", color=(0, 255, 255)  # Amarelo
-                    )
+                    angle_info.append({
+                        'angle': wrist_angle,
+                        'position': wrist_position,
+                        'label': "",
+                        'color': (0, 255, 255)  # Amarelo
+                    })
                 
-                # Desenha o ângulo entre os olhos e o dispositivo (método original)
+                # A visualização do ângulo do pescoço foi removida
+                
+                # Coleta informações do ângulo entre os olhos e o dispositivo (método original)
                 if eyes_to_device_angle is not None and not electronics_detections:  # Só desenha se não tiver desenhado com o novo método
                     # Posição para o texto do ângulo (entre os olhos)
                     if 2 in landmarks and 5 in landmarks:
@@ -429,9 +443,12 @@ class ImageProcessor:
                             (left_eye[1] + right_eye[1]) // 2 - 30  # Um pouco acima dos olhos
                         )
                         
-                        frame_clean = self.visualizer.draw_angle(
-                            frame_clean, eyes_to_device_angle, eyes_position, "", color=(0, 0, 255)  # Vermelho
-                        )
+                        angle_info.append({
+                            'angle': eyes_to_device_angle,
+                            'position': eyes_position,
+                            'label': "",
+                            'color': (0, 0, 255)  # Vermelho
+                        })
             
             # Desenha as detecções de dispositivos eletrônicos
             if electronics_detections and self.config.get('show_electronics', True):
@@ -464,6 +481,16 @@ class ImageProcessor:
             mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=4, circle_radius=4),
             mp_drawing.DrawingSpec(color=(214, 121, 108), thickness=4, circle_radius=4)
         )
+        
+        # Desenha todos os ângulos por último para garantir que fiquem visíveis por cima dos landmarks
+        for info in angle_info:
+            frame_clean = self.visualizer.draw_angle(
+                frame_clean, 
+                info['angle'], 
+                info['position'], 
+                info['label'], 
+                color=info['color']
+            )
         
         return frame_clean
     

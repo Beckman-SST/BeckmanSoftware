@@ -29,6 +29,11 @@ custom_video_pose_connections = [
     (27, 29), (28, 30)   # Tornozelo-calcanhar
 ]
 
+# As conexões para visualização do pescoço foram removidas
+
+# Define as conexões para visualização da coluna vertebral
+spine_connections = [(11, 12), (23, 24)]  # Ombros e quadris
+
 class VideoVisualizer:
     """
     Visualizador específico para processamento de vídeos.
@@ -45,6 +50,10 @@ class VideoVisualizer:
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
         self.tarja_ratio = tarja_ratio  # Proporção para calcular tamanho da tarja
+        
+        # Importa o analisador de ângulos para cálculos
+        from ..analysis.angle_analyzer import AngleAnalyzer
+        self.angle_analyzer = AngleAnalyzer()
         
     def draw_video_landmarks(self, frame, results, show_upper_body=True, show_lower_body=True):
         """
@@ -191,6 +200,211 @@ class VideoVisualizer:
                     color=landmark_color, 
                     thickness=-1  # Preenchido
                 )
+                
+    def draw_spine_angle(self, frame, landmarks_dict, use_vertical_reference=True):
+        """
+        Desenha o ângulo da coluna vertebral no frame, alterando a cor da linha de acordo com a avaliação da postura.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde desenhar
+            landmarks_dict (dict): Dicionário com coordenadas dos landmarks
+            use_vertical_reference (bool): Se True, calcula o ângulo em relação à vertical
+                                          Se False, calcula o ângulo interno
+            
+        Returns:
+            numpy.ndarray: Frame com o ângulo da coluna desenhado
+            float: Ângulo da coluna calculado ou None se não foi possível calcular
+        """
+        # Verifica se temos landmarks suficientes
+        required_landmarks = [11, 12, 23, 24]  # Ombros e quadris
+        if not all(lm_id in landmarks_dict for lm_id in required_landmarks):
+            return frame, None
+        
+        try:
+            # Calcula o ângulo da coluna
+            spine_angle = self.angle_analyzer.calculate_spine_angle(
+                landmarks_dict, 
+                use_vertical_reference=use_vertical_reference
+            )
+            
+            if spine_angle is None:
+                return frame, None
+            
+            # Calcula o ponto médio entre os ombros
+            left_shoulder = landmarks_dict[11]
+            right_shoulder = landmarks_dict[12]
+            shoulder_midpoint = (
+                (left_shoulder[0] + right_shoulder[0]) // 2,
+                (left_shoulder[1] + right_shoulder[1]) // 2
+            )
+            
+            # Calcula o ponto médio entre os quadris
+            left_hip = landmarks_dict[23]
+            right_hip = landmarks_dict[24]
+            hip_midpoint = (
+                (left_hip[0] + right_hip[0]) // 2,
+                (left_hip[1] + right_hip[1]) // 2
+            )
+            
+            # Arredonda o ângulo para avaliação
+            spine_angle_rounded = round(spine_angle, 1)
+            
+            # Determina a cor da linha da coluna com base no ângulo
+            if use_vertical_reference:
+                if spine_angle_rounded <= 5:
+                    # Postura excelente - Verde
+                    spine_color = (0, 255, 0)  # BGR - Verde
+                elif spine_angle_rounded <= 10:
+                    # Postura com atenção - Amarelo
+                    spine_color = (0, 255, 255)  # BGR - Amarelo
+                else:
+                    # Postura ruim - Vermelho
+                    spine_color = (0, 0, 255)  # BGR - Vermelho
+            else:
+                # Para ângulo interno, usar uma lógica diferente se necessário
+                spine_color = (0, 255, 0)  # Verde por padrão
+            
+            # Desenha a linha da coluna com a cor determinada pela avaliação
+            cv2.line(
+                frame,
+                shoulder_midpoint,
+                hip_midpoint,
+                spine_color,
+                thickness=4
+            )
+            
+            # Desenha os pontos médios com a mesma cor da linha
+            cv2.circle(
+                frame,
+                shoulder_midpoint,
+                radius=5,
+                color=spine_color,
+                thickness=-1  # Preenchido
+            )
+            
+            cv2.circle(
+                frame,
+                hip_midpoint,
+                radius=5,
+                color=spine_color,
+                thickness=-1  # Preenchido
+            )
+            
+            if use_vertical_reference:
+                # Desenha a linha vertical de referência
+                vertical_point = (shoulder_midpoint[0], shoulder_midpoint[1] - 100)
+                cv2.line(
+                    frame,
+                    shoulder_midpoint,
+                    vertical_point,
+                    (255, 0, 0),  # Azul
+                    thickness=2,
+                    lineType=cv2.LINE_AA
+                )
+            
+            return frame, spine_angle
+            
+        except Exception as e:
+            print(f"Erro ao desenhar ângulo da coluna: {str(e)}")
+            return frame, None
+    
+    # A função draw_neck_angle foi removida
+    
+    def draw_shoulder_angle(self, frame, landmarks_dict, side='right'):
+        """
+        Desenha o ângulo do braço superior (ombro) no frame, alterando a cor da linha de acordo com a pontuação.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde desenhar
+            landmarks_dict (dict): Dicionário com coordenadas dos landmarks
+            side (str): Lado do corpo ('right' ou 'left')
+            
+        Returns:
+            numpy.ndarray: Frame com o ângulo do ombro desenhado
+            float: Ângulo do ombro calculado ou None se não foi possível calcular
+            int: Pontuação baseada no ângulo (1-4 pontos) ou None se não foi possível calcular
+        """
+        if side == 'right':
+            # Ombro e cotovelo direitos
+            shoulder_id, elbow_id = 12, 14
+            # Ombro oposto para verificar abdução
+            opposite_shoulder_id = 11
+        else:
+            # Ombro e cotovelo esquerdos
+            shoulder_id, elbow_id = 11, 13
+            # Ombro oposto para verificar abdução
+            opposite_shoulder_id = 12
+        
+        # Verifica se todos os landmarks necessários estão disponíveis
+        if not all(lm_id in landmarks_dict for lm_id in [shoulder_id, elbow_id, opposite_shoulder_id]):
+            return frame, None, None
+        
+        try:
+            # Calcula o ângulo do ombro e a pontuação
+            shoulder_angle, score, is_abducted = self.angle_analyzer.calculate_shoulder_angle(
+                landmarks_dict, 
+                side=side
+            )
+            
+            if shoulder_angle is None:
+                return frame, None, None
+            
+            # Obtém as coordenadas dos pontos
+            shoulder = landmarks_dict[shoulder_id]
+            elbow = landmarks_dict[elbow_id]
+            
+            # Determina a cor com base na pontuação
+            if score == 1:
+                color = (0, 255, 0)  # Verde (0° a 20°)
+            elif score == 2:
+                color = (0, 255, 255)  # Amarelo (>20° a 45°)
+            elif score == 3:
+                color = (0, 165, 255)  # Laranja (>45° a 90°)
+            else:  # score == 4
+                color = (0, 0, 255)  # Vermelho (>90°)
+            
+            # Desenha a linha do braço com a cor determinada pela pontuação
+            cv2.line(
+                frame,
+                shoulder,
+                elbow,
+                color,
+                thickness=4
+            )
+            
+            # Desenha círculos nos pontos
+            cv2.circle(
+                frame,
+                shoulder,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            cv2.circle(
+                frame,
+                elbow,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            # Desenha a linha vertical de referência
+            vertical_point = (shoulder[0], shoulder[1] - 100)
+            cv2.line(
+                frame,
+                shoulder,
+                vertical_point,
+                (255, 0, 0),  # Azul
+                thickness=2,
+                lineType=cv2.LINE_AA
+            )
+            
+            return frame, shoulder_angle, score
+            
+        except Exception as e:
+            print(f"Erro ao desenhar ângulo do ombro: {str(e)}")
+            return frame, None, None
     
     def apply_face_blur(self, frame, face_landmarks=None, eye_landmarks=None):
         """
@@ -198,12 +412,12 @@ class VideoVisualizer:
         Método específico para vídeos que mantém compatibilidade.
         
         Args:
-            frame (numpy.ndarray): Frame onde aplicar a tarja
-            face_landmarks (dict): Landmarks faciais (prioridade)
-            eye_landmarks (dict): Landmarks dos olhos (fallback)
+            frame (numpy.ndarray): Frame onde a tarja será aplicada
+            face_landmarks (dict): Dicionário com os landmarks do rosto
+            eye_landmarks (dict): Dicionário com os landmarks dos olhos
             
         Returns:
-            numpy.ndarray: Frame com tarja aplicada
+            numpy.ndarray: Frame com a tarja aplicada
         """
         try:
             if face_landmarks:
@@ -296,5 +510,5101 @@ class VideoVisualizer:
         
         # Aplica retângulo preto quadrado
         cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
+        
+        return frame
         
         return frame

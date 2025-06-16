@@ -406,6 +406,85 @@ class VideoVisualizer:
             print(f"Erro ao desenhar ângulo do ombro: {str(e)}")
             return frame, None, None
     
+    def draw_forearm_angle(self, frame, landmarks_dict, side='right'):
+        """
+        Desenha o ângulo do antebraço (cotovelo a punho) no frame, alterando a cor da linha de acordo com a pontuação.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde desenhar
+            landmarks_dict (dict): Dicionário com coordenadas dos landmarks
+            side (str): Lado do corpo ('right' ou 'left')
+            
+        Returns:
+            numpy.ndarray: Frame com o ângulo do antebraço desenhado
+            float: Ângulo do antebraço calculado ou None se não foi possível calcular
+            int: Pontuação baseada no ângulo (1-2 pontos) ou None se não foi possível calcular
+        """
+        if side == 'right':
+            # Ombro, cotovelo e punho direitos
+            shoulder_id, elbow_id, wrist_id = 12, 14, 16
+        else:
+            # Ombro, cotovelo e punho esquerdos
+            shoulder_id, elbow_id, wrist_id = 11, 13, 15
+        
+        # Verifica se todos os landmarks necessários estão disponíveis
+        if not all(lm_id in landmarks_dict for lm_id in [shoulder_id, elbow_id, wrist_id]):
+            return frame, None, None
+        
+        try:
+            # Calcula o ângulo do antebraço e a pontuação
+            forearm_angle, score = self.angle_analyzer.calculate_forearm_angle(
+                landmarks_dict, 
+                side=side
+            )
+            
+            if forearm_angle is None:
+                return frame, None, None
+            
+            # Obtém as coordenadas dos pontos
+            elbow = landmarks_dict[elbow_id]
+            wrist = landmarks_dict[wrist_id]
+            
+            # Determina a cor com base na pontuação
+            if score == 1:
+                color = (0, 255, 0)  # Verde (60° a 100°)
+            else:  # score == 2
+                color = (0, 255, 255)  # Amarelo (fora da faixa)
+            
+            # Desenha a linha do antebraço com a cor determinada pela pontuação
+            cv2.line(
+                frame,
+                elbow,
+                wrist,
+                color,
+                thickness=4
+            )
+            
+            # Desenha círculos nos pontos
+            cv2.circle(
+                frame,
+                elbow,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            cv2.circle(
+                frame,
+                wrist,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            # Texto com ângulo removido conforme solicitado
+            
+            return frame, forearm_angle, score
+            
+        except Exception as e:
+            print(f"Erro ao desenhar ângulo do antebraço: {str(e)}")
+            return frame, None, None
+    
     def apply_face_blur(self, frame, face_landmarks=None, eye_landmarks=None):
         """
         Aplica tarja no rosto usando landmarks faciais ou dos olhos.

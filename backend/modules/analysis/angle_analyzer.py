@@ -89,6 +89,49 @@ class AngleAnalyzer:
             landmarks[wrist_id]
         )
     
+    def calculate_forearm_angle(self, landmarks, side='right'):
+        """
+        Calcula o ângulo do antebraço (cotovelo a punho).
+        
+        Args:
+            landmarks (dict): Dicionário com as coordenadas dos landmarks
+            side (str): Lado do corpo ('right' ou 'left')
+            
+        Returns:
+            float: Ângulo do antebraço ou None se não for possível calcular
+            int: Pontuação baseada no ângulo (1-2 pontos)
+        """
+        if side == 'right':
+            # Ombro, cotovelo e pulso direitos
+            shoulder_id, elbow_id, wrist_id = 12, 14, 16
+        else:
+            # Ombro, cotovelo e pulso esquerdos
+            shoulder_id, elbow_id, wrist_id = 11, 13, 15
+        
+        # Verifica se todos os landmarks necessários estão disponíveis
+        if not all(lm_id in landmarks for lm_id in [shoulder_id, elbow_id, wrist_id]):
+            return None, None
+        
+        # Calcula o ângulo entre ombro, cotovelo e pulso
+        forearm_angle = calculate_angle(
+            landmarks[shoulder_id],
+            landmarks[elbow_id],
+            landmarks[wrist_id]
+        )
+        
+        if forearm_angle is None:
+            return None, None
+        
+        # Determina a pontuação com base no ângulo
+        # 60° a 100° = 1 ponto (verde)
+        # Fora dessa faixa = 2 pontos (amarelo)
+        if 60 <= forearm_angle <= 100:
+            score = 1  # Verde (60° a 100°)
+        else:
+            score = 2  # Amarelo (fora da faixa)
+        
+        return forearm_angle, score
+    
     def calculate_wrist_angle(self, landmarks, side='right'):
         """
         Calcula o ângulo do pulso entre cotovelo, pulso e dedo médio.

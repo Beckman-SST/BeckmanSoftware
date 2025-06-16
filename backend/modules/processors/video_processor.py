@@ -355,6 +355,28 @@ class VideoProcessor:
                             side='left'
                         )
                     
+                    # Verifica se temos landmarks suficientes para calcular o ângulo do antebraço direito
+                    right_forearm_landmarks_available = all(lm_id in pose_landmarks for lm_id in [12, 14, 16])
+                    
+                    if right_forearm_landmarks_available:
+                        # Desenha o ângulo do antebraço direito
+                        frame, right_forearm_angle, right_forearm_score = self.video_visualizer.draw_forearm_angle(
+                            frame,
+                            pose_landmarks,
+                            side='right'
+                        )
+                    
+                    # Verifica se temos landmarks suficientes para calcular o ângulo do antebraço esquerdo
+                    left_forearm_landmarks_available = all(lm_id in pose_landmarks for lm_id in [11, 13, 15])
+                    
+                    if left_forearm_landmarks_available:
+                        # Desenha o ângulo do antebraço esquerdo
+                        frame, left_forearm_angle, left_forearm_score = self.video_visualizer.draw_forearm_angle(
+                            frame,
+                            pose_landmarks,
+                            side='left'
+                        )
+                    
             # Desenha landmarks de pose básicos se habilitado (modo debug)
             if self.config.get('show_pose_landmarks', False) and results.pose_landmarks:
                 self.mp_drawing.draw_landmarks(

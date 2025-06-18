@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..core.utils import ensure_directory_exists, get_timestamp
 from ..detection.pose_detector import PoseDetector
 from ..visualization.video_visualizer import VideoVisualizer
+from ..visualization.face_utils import FaceUtils
 
 class VideoProcessor:
     def __init__(self, config):
@@ -39,7 +40,19 @@ class VideoProcessor:
         self.angle_analyzer = AngleAnalyzer()
         
         # Inicializa o visualizador específico para vídeos
-        self.video_visualizer = VideoVisualizer(tarja_ratio=0.20)
+        # Usa um limiar de qualidade para exibição de landmarks
+        landmark_quality = self.config.get('landmark_quality_threshold', 0.6)
+        self.video_visualizer = VideoVisualizer(
+            tarja_ratio=0.20,
+            tarja_max_size=200,
+            landmark_quality_threshold=landmark_quality
+        )
+        
+        # Inicializa o utilitário para operações faciais
+        self.face_utils = FaceUtils(
+            tarja_ratio=0.20,
+            tarja_max_size=200
+        )
     
     def process_video(self, video_path, output_folder, progress_callback=None):
         """
@@ -315,7 +328,7 @@ class VideoProcessor:
                 face_landmarks = self._get_face_landmarks_with_fallback(results, width, height, pose_landmarks)
                 
                 # Aplica a tarja usando os melhores landmarks disponíveis
-                frame = self.video_visualizer.apply_face_blur(
+                frame = self.face_utils.apply_face_tarja(
                     frame, 
                     face_landmarks=face_landmarks.get('face_mesh') if face_landmarks else None,
                     eye_landmarks=face_landmarks.get('pose_eyes') if face_landmarks else pose_landmarks

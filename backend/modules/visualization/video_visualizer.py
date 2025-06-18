@@ -40,16 +40,21 @@ class VideoVisualizer:
     Mantém a lógica original de desenho de landmarks para vídeos.
     """
     
-    def __init__(self, tarja_ratio=0.20):
+    def __init__(self, tarja_ratio=0.20, tarja_max_size=200, landmark_quality_threshold=0.6):
         """
         Inicializa o visualizador de vídeo.
         
         Args:
             tarja_ratio (float): Proporção da largura do frame para calcular tamanho mínimo da tarja (padrão: 0.20 = 20%)
+            tarja_max_size (int): Tamanho máximo da tarja em pixels (padrão: 200px)
+            landmark_quality_threshold (float): Limiar de qualidade para exibição de landmarks (0.0 a 1.0)
+                                              Landmarks com confiança abaixo deste valor não serão exibidos
         """
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
         self.tarja_ratio = tarja_ratio  # Proporção para calcular tamanho da tarja
+        self.tarja_max_size = tarja_max_size  # Tamanho máximo da tarja em pixels
+        self.landmark_quality_threshold = landmark_quality_threshold  # Limiar de qualidade para exibição
         
         # Importa o analisador de ângulos para cálculos
         from ..analysis.angle_analyzer import AngleAnalyzer
@@ -58,6 +63,7 @@ class VideoVisualizer:
     def draw_video_landmarks(self, frame, results, show_upper_body=True, show_lower_body=True):
         """
         Desenha landmarks de pose especificamente para vídeos usando a lógica original.
+        Aplica um limiar de qualidade para exibir apenas landmarks com confiança satisfatória.
         
         Args:
             frame (numpy.ndarray): Frame onde os landmarks serão desenhados
@@ -75,13 +81,18 @@ class VideoVisualizer:
             # Obtém dimensões do frame
             h, w, _ = frame.shape
             
-            # Converte landmarks para coordenadas de pixel
+            # Converte landmarks para coordenadas de pixel, aplicando o limiar de qualidade
             landmarks_dict = {}
             for i, landmark in enumerate(results.pose_landmarks.landmark):
-                if landmark.visibility >= 0.5:  # Só considera landmarks visíveis
+                # Só considera landmarks com visibilidade acima do limiar de qualidade
+                if landmark.visibility >= self.landmark_quality_threshold:  
                     x = int(landmark.x * w)
                     y = int(landmark.y * h)
                     landmarks_dict[i] = (x, y)
+            
+            # Se não houver landmarks com qualidade suficiente, retorna o frame sem alterações
+            if not landmarks_dict:
+                return frame
             
             # Filtra conexões baseado nas configurações
             connections_to_draw = self._filter_video_connections(
@@ -290,17 +301,7 @@ class VideoVisualizer:
                 thickness=-1  # Preenchido
             )
             
-            if use_vertical_reference:
-                # Desenha a linha vertical de referência
-                vertical_point = (shoulder_midpoint[0], shoulder_midpoint[1] - 100)
-                cv2.line(
-                    frame,
-                    shoulder_midpoint,
-                    vertical_point,
-                    (255, 0, 0),  # Azul
-                    thickness=2,
-                    lineType=cv2.LINE_AA
-                )
+            # Linha vertical de referência removida conforme solicitado
             
             return frame, spine_angle
             
@@ -389,16 +390,7 @@ class VideoVisualizer:
                 thickness=-1  # Preenchido
             )
             
-            # Desenha a linha vertical de referência
-            vertical_point = (shoulder[0], shoulder[1] - 100)
-            cv2.line(
-                frame,
-                shoulder,
-                vertical_point,
-                (255, 0, 0),  # Azul
-                thickness=2,
-                lineType=cv2.LINE_AA
-            )
+            # Linha vertical de referência removida conforme solicitado
             
             return frame, shoulder_angle, score
             
@@ -500,8 +492,8 @@ class VideoVisualizer:
         """
         try:
             if face_landmarks:
-                # Usa landmarks faciais completos
-                return self._apply_face_tarja_from_face(frame, face_landmarks)
+                # Usa landmarks faciais completos para criar uma tarja oval
+                return self._apply_face_oval_tarja_from_face_mesh(frame, face_landmarks)
             elif eye_landmarks:
                 # Usa landmarks dos olhos como fallback
                 return self._apply_face_tarja_from_eyes(frame, eye_landmarks)
@@ -515,7 +507,7 @@ class VideoVisualizer:
     def _apply_face_tarja_from_face(self, frame, face_landmarks):
         """
         Aplica tarja baseada em landmarks faciais completos.
-        Usa tamanho fixo grande para garantir privacidade constante.
+        Ajusta o tamanho da tarja com base na distância estimada da pessoa.
         """
         if not face_landmarks:
             return frame
@@ -530,9 +522,23 @@ class VideoVisualizer:
         center_x = sum(x_coords) // len(x_coords)
         center_y = sum(y_coords) // len(y_coords)
         
-        # Calcula tamanho da tarja baseado na largura do frame (similar ao processamento de imagens)
+        # Estima a distância da pessoa com base na dispersão dos landmarks faciais
+        # Quanto maior a dispersão, mais próxima a pessoa está da câmera
+        x_min, x_max = min(x_coords), max(x_coords)
+        y_min, y_max = min(y_coords), max(y_coords)
+        face_width = x_max - x_min
+        face_height = y_max - y_min
+        face_size = max(face_width, face_height)
+        
+        # Calcula tamanho da tarja proporcional ao tamanho do rosto
+        # Quanto menor o rosto (pessoa mais distante), menor a tarja
         frame_width = frame.shape[1]
-        tarja_size = max(100, int(frame_width * self.tarja_ratio))  # Mínimo 100px, máximo 20% da largura
+        face_ratio = face_size / frame_width  # Proporção do rosto em relação à largura do frame
+        
+        # Ajusta o tamanho da tarja com base na proporção do rosto
+        # Usa um fator de escala para garantir que a tarja cubra adequadamente o rosto
+        scale_factor = 1.5  # Fator para garantir que a tarja seja maior que o rosto
+        tarja_size = max(100, min(int(face_size * scale_factor), self.tarja_max_size))  # Mínimo 100px, máximo limitado
         
         # Calcula coordenadas do quadrado centrado
         half_size = tarja_size // 2
@@ -549,7 +555,7 @@ class VideoVisualizer:
     def _apply_face_tarja_from_eyes(self, frame, eye_landmarks):
         """
         Aplica tarja baseada em landmarks dos olhos.
-        Usa tamanho fixo grande para garantir privacidade constante.
+        Ajusta o tamanho da tarja com base na distância estimada da pessoa.
         """
         if not eye_landmarks:
             return frame
@@ -562,23 +568,44 @@ class VideoVisualizer:
             # Calcula centro baseado nos dois olhos
             center_x = (left_eye[0] + right_eye[0]) // 2
             center_y = (left_eye[1] + right_eye[1]) // 2
-        elif left_eye:
-            # Usa apenas olho esquerdo
-            center_x, center_y = left_eye[0], left_eye[1]
-        elif right_eye:
-            # Usa apenas olho direito
-            center_x, center_y = right_eye[0], right_eye[1]
+            
+            # Calcula a distância entre os olhos para estimar o tamanho do rosto
+            # Quanto maior a distância, mais próxima a pessoa está da câmera
+            eye_distance = np.sqrt((right_eye[0] - left_eye[0])**2 + (right_eye[1] - left_eye[1])**2)
+            
+            # Calcula tamanho da tarja proporcional à distância entre os olhos
+            frame_width = frame.shape[1]
+            eye_ratio = eye_distance / frame_width  # Proporção da distância dos olhos em relação à largura do frame
+            
+            # Ajusta o tamanho da tarja com base na distância entre os olhos
+            # Usa um fator de escala para garantir que a tarja cubra adequadamente o rosto
+            scale_factor = 3.0  # Fator para garantir que a tarja seja maior que a distância entre os olhos
+            tarja_size = max(100, min(int(eye_distance * scale_factor), self.tarja_max_size))  # Mínimo 100px, máximo limitado
+        elif left_eye or right_eye:
+            # Se tiver apenas um olho, usa um tamanho padrão menor
+            center_x, center_y = left_eye if left_eye else right_eye
+            frame_width = frame.shape[1]
+            tarja_size = max(100, min(int(frame_width * 0.15), self.tarja_max_size))  # Usa 15% da largura do frame
         else:
             # Tenta usar outros landmarks faciais disponíveis
             available_landmarks = [(x, y) for x, y in eye_landmarks.values() if x > 0 and y > 0]
             if not available_landmarks:
                 return frame
+            
+            # Calcula o centro e estima o tamanho com base na dispersão dos landmarks
             center_x = sum(x for x, y in available_landmarks) // len(available_landmarks)
             center_y = sum(y for x, y in available_landmarks) // len(available_landmarks)
-        
-        # Calcula tamanho da tarja baseado na largura do frame (similar ao processamento de imagens)
-        frame_width = frame.shape[1]
-        tarja_size = max(100, int(frame_width * self.tarja_ratio))  # Mínimo 100px, máximo 20% da largura
+            
+            # Calcula a dispersão dos landmarks para estimar o tamanho do rosto
+            x_coords = [x for x, y in available_landmarks]
+            y_coords = [y for x, y in available_landmarks]
+            x_min, x_max = min(x_coords), max(x_coords)
+            y_min, y_max = min(y_coords), max(y_coords)
+            face_size = max(x_max - x_min, y_max - y_min)
+            
+            # Ajusta o tamanho da tarja com base na dispersão dos landmarks
+            frame_width = frame.shape[1]
+            tarja_size = max(100, min(int(face_size * 1.5), self.tarja_max_size))  # Fator 1.5 para garantir cobertura
         
         # Calcula coordenadas do quadrado centrado
         half_size = tarja_size // 2
@@ -591,6 +618,86 @@ class VideoVisualizer:
         cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
         
         return frame
+        
+    def _apply_face_oval_tarja_from_face_mesh(self, frame, face_landmarks):
+        """
+        Aplica tarja oval baseada nos landmarks do face_mesh.
+        Cria uma elipse que se adapta ao formato do rosto.
+        
+        Args:
+            frame (numpy.ndarray): Frame a ser processado
+            face_landmarks (dict): Dicionário com os landmarks do face_mesh
+            
+        Returns:
+            numpy.ndarray: Frame com tarja oval aplicada
+        """
+        if not face_landmarks or len(face_landmarks) < 10:
+            return frame
+            
+        try:
+            # Extrai os pontos do contorno do rosto do face_mesh
+            # Pontos do contorno facial no face_mesh (aproximadamente)
+            contour_indices = [
+                10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+                397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+                172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109
+            ]
+            
+            contour_points = []
+            for idx in contour_indices:
+                if idx in face_landmarks:
+                    contour_points.append(face_landmarks[idx])
+            
+            if len(contour_points) < 5:  # Precisamos de pelo menos 5 pontos para uma elipse
+                # Fallback para todos os pontos se não tivermos pontos de contorno suficientes
+                contour_points = list(face_landmarks.values())
+            
+            # Converte para o formato numpy para cálculos
+            contour_points = np.array(contour_points, dtype=np.int32)
+            
+            # Calcula o retângulo delimitador da elipse
+            x_coords = contour_points[:, 0]
+            y_coords = contour_points[:, 1]
+            
+            # Calcula o centro do rosto
+            center_x = int(np.mean(x_coords))
+            center_y = int(np.mean(y_coords))
+            
+            # Calcula os eixos da elipse
+            # Adiciona uma margem para garantir que todo o rosto seja coberto
+            margin_factor = 1.2  # 20% de margem
+            axis_x = int((np.max(x_coords) - np.min(x_coords)) * margin_factor / 2)
+            axis_y = int((np.max(y_coords) - np.min(y_coords)) * margin_factor / 2)
+            
+            # Garante tamanho mínimo e máximo para a elipse
+            min_axis = 50  # Tamanho mínimo para cada eixo
+            axis_x = max(min_axis, min(axis_x, self.tarja_max_size // 2))
+            axis_y = max(min_axis, min(axis_y, self.tarja_max_size // 2))
+            
+            # Cria uma máscara do tamanho do frame
+            mask = np.zeros(frame.shape[:2], dtype=np.uint8)
+            
+            # Desenha a elipse preenchida na máscara
+            cv2.ellipse(
+                mask,
+                (center_x, center_y),  # centro
+                (axis_x, axis_y),      # eixos
+                0,                     # ângulo
+                0, 360,                # ângulo inicial e final
+                (255),                 # cor (branco)
+                -1                     # espessura (preenchido)
+            )
+            
+            # Aplica a máscara ao frame (pinta de preto onde a máscara é branca)
+            frame_with_mask = frame.copy()
+            frame_with_mask[mask == 255] = (0, 0, 0)  # Preto
+            
+            return frame_with_mask
+            
+        except Exception as e:
+            print(f"Erro ao aplicar tarja oval: {str(e)}")
+            # Em caso de erro, volta para o método retangular
+            return self._apply_face_tarja_from_face(frame, face_landmarks)
         
         return frame
         

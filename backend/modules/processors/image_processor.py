@@ -7,6 +7,7 @@ from ..detection.pose_detector import PoseDetector
 from ..detection.electronics_detector import ElectronicsDetector
 from ..analysis.angle_analyzer import AngleAnalyzer
 from ..visualization.pose_visualizer import PoseVisualizer
+from ..visualization.face_utils import FaceUtils
 
 class ImageProcessor:
     def __init__(self, config):
@@ -31,6 +32,12 @@ class ImageProcessor:
         
         self.angle_analyzer = AngleAnalyzer()
         self.visualizer = PoseVisualizer()
+        
+        # Inicializa o utilitário para operações faciais
+        self.face_utils = FaceUtils(
+            tarja_ratio=0.20,
+            tarja_max_size=200
+        )
     
     def process_image(self, image_path, output_folder):
         """
@@ -132,13 +139,13 @@ class ImageProcessor:
         # Cria uma cópia limpa do frame para desenhar
         processed_frame = frame.copy()
         
-        # Aplica desfoque no rosto se a opção estiver habilitada
+        # Aplica tarja no rosto se a opção estiver habilitada
         if self.config.get('show_face_blur', True):
             # Obtém os landmarks do rosto
             face_landmarks = self.pose_detector.get_face_landmarks(results, width, height)
             
-            # Aplica o desfoque
-            processed_frame = self.visualizer.apply_face_blur(processed_frame, face_landmarks, landmarks)
+            # Aplica a tarja
+            processed_frame = self.face_utils.apply_face_tarja(processed_frame, face_landmarks, landmarks)
         
         # Processa o corpo com base no tipo de pose detectada (inferior ou lateral)
         if is_lower_body and self.config.get('show_lower_body', True):

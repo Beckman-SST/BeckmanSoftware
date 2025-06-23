@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         const fileInput = document.getElementById('files');
+        const apenasTarja = document.getElementById('apenas-tarja');
         if (fileInput.files.length === 0) {
             showFlashMessage('Selecione pelo menos um arquivo para processamento.', 'warning');
             return;
@@ -273,33 +274,20 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('files', fileInput.files[i]);
         }
-        
-        // Desabilita o botão de upload
+        formData.append('apenas_tarja', apenasTarja.checked ? '1' : '0');
         document.getElementById('btn-upload').disabled = true;
-        
-        // Mostra mensagem de carregamento
         showFlashMessage('Enviando arquivos para processamento...', 'info');
-        
         fetch(`${API_URL}/upload`, {
             method: 'POST',
             body: formData
         })
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                // Limpa o formulário
-                fileInput.value = '';
-                document.getElementById('preview-container').style.display = 'none';
-                
-                // Inicia a verificação de status
-                checkStatus();
-            } else {
-                showFlashMessage(data.message || 'Erro ao enviar arquivos.', 'error');
-                document.getElementById('btn-upload').disabled = false;
-            }
+            fileInput.value = '';
+            showFlashMessage(data.message || 'Erro ao enviar arquivos.', data.success ? 'success' : 'error');
+            document.getElementById('btn-upload').disabled = false;
         })
-        .catch(error => {
-            console.error('Erro:', error);
+        .catch(() => {
             showFlashMessage('Erro ao enviar arquivos para processamento.', 'error');
             document.getElementById('btn-upload').disabled = false;
         });

@@ -30,7 +30,7 @@ class ImageProcessor:
         )
         
         self.angle_analyzer = AngleAnalyzer()
-        self.visualizer = PoseVisualizer()
+        self.visualizer = PoseVisualizer(face_padding=10)  # Usa padding menor para a tarja facial
     
     def process_image(self, image_path, output_folder):
         """

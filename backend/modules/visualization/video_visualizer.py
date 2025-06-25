@@ -40,12 +40,12 @@ class VideoVisualizer:
     Mantém a lógica original de desenho de landmarks para vídeos.
     """
     
-    def __init__(self, tarja_ratio=0.20):
+    def __init__(self, tarja_ratio=0.12):
         """
         Inicializa o visualizador de vídeo.
         
         Args:
-            tarja_ratio (float): Proporção da largura do frame para calcular tamanho mínimo da tarja (padrão: 0.20 = 20%)
+            tarja_ratio (float): Proporção da largura do frame para calcular tamanho mínimo da tarja (padrão: 0.12 = 12%)
         """
         self.mp_drawing = mp.solutions.drawing_utils
         self.mp_pose = mp.solutions.pose
@@ -532,7 +532,7 @@ class VideoVisualizer:
         
         # Calcula tamanho da tarja baseado na largura do frame (similar ao processamento de imagens)
         frame_width = frame.shape[1]
-        tarja_size = max(100, int(frame_width * self.tarja_ratio))  # Mínimo 100px, máximo 20% da largura
+        tarja_size = max(80, int(frame_width * self.tarja_ratio))  # Mínimo 80px, máximo 12% da largura
         
         # Calcula coordenadas do quadrado centrado
         half_size = tarja_size // 2
@@ -578,7 +578,7 @@ class VideoVisualizer:
         
         # Calcula tamanho da tarja baseado na largura do frame (similar ao processamento de imagens)
         frame_width = frame.shape[1]
-        tarja_size = max(100, int(frame_width * self.tarja_ratio))  # Mínimo 100px, máximo 20% da largura
+        tarja_size = max(80, int(frame_width * self.tarja_ratio))  # Mínimo 80px, máximo 12% da largura
         
         # Calcula coordenadas do quadrado centrado
         half_size = tarja_size // 2

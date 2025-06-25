@@ -39,7 +39,7 @@ class VideoProcessor:
         self.angle_analyzer = AngleAnalyzer()
         
         # Inicializa o visualizador específico para vídeos
-        self.video_visualizer = VideoVisualizer(tarja_ratio=0.20)
+        self.video_visualizer = VideoVisualizer(tarja_ratio=0.10)
     
     def process_video(self, video_path, output_folder, progress_callback=None):
         """

@@ -46,11 +46,19 @@ def process_file(file_path, output_folder, config_file=None):
     file_extension = os.path.splitext(file_path)[1].lower()
     
     if file_extension in ['.jpg', '.jpeg', '.png', '.bmp']:
-        # Processa a imagem
-        processor = ImageProcessor(config)
-        result = processor.process_image(file_path, output_folder)
-        processor.release()
-        return result
+        # Verifica se deve processar apenas com tarja facial (modo operacional)
+        if config.get('only_face_blur', False):
+            # Usa o processador operacional que aplica apenas a tarja facial
+            from modules.processors.operacional_tarja_processor import OperacionalTarjaProcessor
+            processor = OperacionalTarjaProcessor(config)
+            result = processor.process_image(file_path, output_folder)
+            return result
+        else:
+            # Processa a imagem normalmente com análise de postura
+            processor = ImageProcessor(config)
+            result = processor.process_image(file_path, output_folder)
+            processor.release()
+            return result
     
     elif file_extension in ['.mp4', '.avi', '.mov', '.mkv']:
         # Processa o vídeo

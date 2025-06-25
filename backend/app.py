@@ -77,6 +77,7 @@ default_config = {
     'show_upper_body': True,
     'show_lower_body': True,
     'process_lower_body': True,
+    'only_face_blur': False,  # Nova opção para processar apenas com tarja facial
     'resize_width': 800
 }
 
@@ -152,7 +153,7 @@ def adicionar_erro(mensagem):
     """Adiciona uma mensagem de erro à lista thread-safe"""
     error_messages.append(mensagem)
 
-def processar_arquivos(file_paths):
+def processar_arquivos(file_paths, is_operacional=False):
     global processamento_ativo, cancelar_processamento, arquivo_atual, total_files, tempos_processamento
     
     processamento_ativo = True
@@ -254,6 +255,13 @@ def processar_arquivos(file_paths):
     tempo_total = time.time() - tempo_inicio
     add_log(f'Processamento finalizado. Tempo total: {int(tempo_total)} segundos')
     
+    # Se foi um processamento operacional, restaura a configuração para o valor padrão
+    if is_operacional:
+        config = load_config()
+        config['only_face_blur'] = False
+        save_config_to_file(config)
+        add_log('Configuração de processamento operacional restaurada para o padrão')
+    
     processamento_ativo = False
     cancelar_processamento = False
     return True
@@ -314,6 +322,7 @@ def save_config():
         'show_upper_body': 'show_upper_body' in request.form,
         'show_lower_body': 'show_lower_body' in request.form,
         'process_lower_body': 'process_lower_body' in request.form,
+        'only_face_blur': 'only_face_blur' in request.form,  # Nova opção para processar apenas com tarja facial
         'resize_width': int(request.form.get('resize_width', default_config['resize_width']))
     }
     
@@ -346,6 +355,15 @@ def upload_file():
         flash('Nenhum arquivo selecionado', 'error')
         return redirect(url_for('index'))
     
+    # Verifica se é um processamento operacional
+    is_operacional = 'processing_type' in request.form and request.form['processing_type'] == 'operacional'
+    
+    # Se for processamento operacional, atualiza a configuração para usar apenas tarja facial
+    if is_operacional:
+        config = load_config()
+        config['only_face_blur'] = True
+        save_config_to_file(config)
+    
     # Lista para armazenar os caminhos dos arquivos válidos
     valid_files = []
     
@@ -364,8 +382,12 @@ def upload_file():
     
     if valid_files:
         # Inicia o processamento em uma thread separada
-        threading.Thread(target=processar_arquivos, args=(valid_files,)).start()
-        flash(f'{len(valid_files)} arquivo(s) enviado(s) para processamento', 'success')
+        threading.Thread(target=processar_arquivos, args=(valid_files, is_operacional)).start()
+        
+        if is_operacional:
+            flash(f'{len(valid_files)} arquivo(s) enviado(s) para processamento operacional com tarja facial.', 'success')
+        else:
+            flash(f'{len(valid_files)} arquivo(s) enviado(s) para processamento.', 'success')
     
     return redirect(url_for('index'))
 

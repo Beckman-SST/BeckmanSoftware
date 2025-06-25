@@ -31,10 +31,14 @@ custom_pose_connections = [
 ]
 
 class PoseVisualizer:
-    def __init__(self):
+    def __init__(self, face_padding=10):
         """
         Inicializa o visualizador de pose.
+        
+        Args:
+            face_padding (int): Padding em pixels para a tarja facial (padrão: 10)
         """
+        self.face_padding = face_padding
     
     def draw_landmarks(self, frame, results, show_face=True, show_upper_body=True, show_lower_body=True):
         """
@@ -375,12 +379,11 @@ class PoseVisualizer:
             x_min, x_max = min(x_coords), max(x_coords)
             y_min, y_max = min(y_coords), max(y_coords)
             
-            # Adiciona padding ao retângulo
-            padding = 20
-            x_min = max(0, x_min - padding)
-            x_max = min(w, x_max + padding)
-            y_min = max(0, y_min - padding)
-            y_max = min(h, y_max + padding)
+            # Adiciona padding ao retângulo usando o valor configurado
+            x_min = max(0, x_min - self.face_padding)
+            x_max = min(w, x_max + self.face_padding)
+            y_min = max(0, y_min - self.face_padding)
+            y_max = min(h, y_max + self.face_padding)
             
             # Aplica um retângulo preto para ocultar o rosto
             cv2.rectangle(blurred_frame, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
@@ -400,9 +403,9 @@ class PoseVisualizer:
                 y_min = min(left_eye[1], right_eye[1])
                 y_max = max(left_eye[1], right_eye[1])
                 
-                # Garante um tamanho mínimo para a tarja
-                tarja_width = max(x_max - x_min, int(w * 0.20))
-                tarja_height = int(tarja_width * 1.0)  # Altura igual à largura para melhor cobertura
+                # Garante um tamanho mínimo para a tarja (reduzido)
+                tarja_width = max(x_max - x_min, int(w * 0.12))
+                tarja_height = int(tarja_width * 0.9)  # Altura ligeiramente menor que a largura para melhor ajuste
                 
                 # Centraliza a tarja horizontalmente
                 center_x = (x_min + x_max) // 2

@@ -14,6 +14,7 @@ DEFAULT_CONFIG = {
     'show_upper_body': True,
     'show_lower_body': True,
     'process_lower_body': True,
+    'only_face_blur': False,  # Nova opção para processar apenas com tarja facial
     'resize_width': 800
 }
 

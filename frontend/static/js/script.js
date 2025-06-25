@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         const fileInput = document.getElementById('files');
-        const apenasTarja = document.getElementById('apenas-tarja');
+        // Removido: const apenasTarja = document.getElementById('apenas-tarja');
         if (fileInput.files.length === 0) {
             showFlashMessage('Selecione pelo menos um arquivo para processamento.', 'warning');
             return;
@@ -274,7 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
         for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('files', fileInput.files[i]);
         }
-        formData.append('apenas_tarja', apenasTarja.checked ? '1' : '0');
+        // Removido: formData.append('apenas_tarja', apenasTarja.checked ? '1' : '0');
         document.getElementById('btn-upload').disabled = true;
         showFlashMessage('Enviando arquivos para processamento...', 'info');
         fetch(`${API_URL}/upload`, {

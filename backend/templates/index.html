@@ -531,6 +531,32 @@
     <script>
     // Traduzir textos do input de arquivo para português
     document.addEventListener('DOMContentLoaded', function() {
+        // Restaura a aba ativa do localStorage
+        const activeTab = localStorage.getItem('activeProcessingTab');
+        if (activeTab) {
+            // Remove a classe active da aba padrão
+            document.getElementById('normal-tab').classList.remove('active');
+            document.getElementById('normal-content').classList.remove('show', 'active');
+            
+            // Ativa a aba salva
+            const savedTab = document.getElementById(activeTab + '-tab');
+            const savedContent = document.getElementById(activeTab + '-content');
+            if (savedTab && savedContent) {
+                savedTab.classList.add('active');
+                savedTab.setAttribute('aria-selected', 'true');
+                savedContent.classList.add('show', 'active');
+            }
+        }
+        
+        // Adiciona event listeners para salvar a aba ativa
+        document.getElementById('normal-tab').addEventListener('click', function() {
+            localStorage.setItem('activeProcessingTab', 'normal');
+        });
+        
+        document.getElementById('operacional-tab').addEventListener('click', function() {
+            localStorage.setItem('activeProcessingTab', 'operacional');
+        });
+        
         // Traduz o texto "No file chosen" e "Choose File"
         const fileInput = document.getElementById('files');
         if (fileInput) {

@@ -131,13 +131,15 @@
                     
                     <div class="mb-3">
                         <label class="form-label">Conexões de Pose a Exibir:</label>
-                        <div class="form-check">
+                        <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="show_upper_body" name="show_upper_body" {% if config.show_upper_body %}checked{% endif %}>
                             <label class="form-check-label" for="show_upper_body">Parte Superior do Corpo (Braços e Ombros)</label>
+                            <div class="form-text">Ativa ou desativa a visualização das conexões da parte superior do corpo no esqueleto.</div>
                         </div>
-                        <div class="form-check">
+                        <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="show_lower_body" name="show_lower_body" {% if config.show_lower_body %}checked{% endif %}>
                             <label class="form-check-label" for="show_lower_body">Parte Inferior do Corpo (Pernas e Pés)</label>
+                            <div class="form-text">Ativa ou desativa a visualização das conexões da parte inferior do corpo no esqueleto.</div>
                         </div>
                     </div>
                 </div>

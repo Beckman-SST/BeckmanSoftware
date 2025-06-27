@@ -12,7 +12,7 @@ class OperacionalTarjaProcessor:
             min_tracking_confidence=config.get('min_tracking_confidence', 0.8),
             moving_average_window=config.get('moving_average_window', 5)
         )
-        self.visualizer = VideoVisualizer(tarja_ratio=0.10)  # Usa tarja menor para imagens operacionais
+        self.visualizer = VideoVisualizer(tarja_ratio=0.14)  # Aumentado para 14% conforme solicitado
 
     def process_image(self, image_path, output_folder):
         if not os.path.exists(image_path):

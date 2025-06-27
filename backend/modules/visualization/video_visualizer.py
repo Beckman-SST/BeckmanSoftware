@@ -291,16 +291,8 @@ class VideoVisualizer:
             )
             
             if use_vertical_reference:
-                # Desenha a linha vertical de referência
-                vertical_point = (shoulder_midpoint[0], shoulder_midpoint[1] - 100)
-                cv2.line(
-                    frame,
-                    shoulder_midpoint,
-                    vertical_point,
-                    (255, 0, 0),  # Azul
-                    thickness=2,
-                    lineType=cv2.LINE_AA
-                )
+                # Linha vertical de referência removida conforme solicitado
+                pass  # Mantém o bloco if com um pass para evitar erros
             
             return frame, spine_angle
             
@@ -389,16 +381,7 @@ class VideoVisualizer:
                 thickness=-1  # Preenchido
             )
             
-            # Desenha a linha vertical de referência
-            vertical_point = (shoulder[0], shoulder[1] - 100)
-            cv2.line(
-                frame,
-                shoulder,
-                vertical_point,
-                (255, 0, 0),  # Azul
-                thickness=2,
-                lineType=cv2.LINE_AA
-            )
+            # Linha vertical de referência removida conforme solicitado
             
             return frame, shoulder_angle, score
             

@@ -6,9 +6,9 @@
     "show_face_blur": true,
     "show_electronics": false,
     "show_angles": true,
-    "show_upper_body": false,
+    "show_upper_body": true,
     "show_lower_body": true,
     "process_lower_body": true,
-    "resize_width": 800,
-    "only_face_blur": false
+    "only_face_blur": false,
+    "resize_width": 800
 }

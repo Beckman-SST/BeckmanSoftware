@@ -468,6 +468,103 @@ class VideoVisualizer:
             print(f"Erro ao desenhar ângulo do antebraço: {str(e)}")
             return frame, None, None
     
+    def draw_knee_angle(self, frame, landmarks_dict, side='right'):
+        """
+        Desenha o ângulo do joelho no frame, alterando a cor da linha de acordo com a pontuação baseada nos critérios de Suzanne Rodgers.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde desenhar
+            landmarks_dict (dict): Dicionário com coordenadas dos landmarks
+            side (str): Lado do corpo ('right' ou 'left')
+            
+        Returns:
+            numpy.ndarray: Frame com o ângulo do joelho desenhado
+            float: Ângulo do joelho calculado ou None se não foi possível calcular
+            int: Pontuação baseada no ângulo (1-3 pontos) ou None se não foi possível calcular
+        """
+        if side == 'right':
+            # Quadril, joelho e tornozelo direitos
+            hip_id, knee_id, ankle_id = 24, 26, 28
+        else:
+            # Quadril, joelho e tornozelo esquerdos
+            hip_id, knee_id, ankle_id = 23, 25, 27
+        
+        # Verifica se todos os landmarks necessários estão disponíveis
+        if not all(lm_id in landmarks_dict for lm_id in [hip_id, knee_id, ankle_id]):
+            return frame, None, None
+        
+        try:
+            # Calcula o ângulo do joelho e a pontuação
+            knee_angle, score = self.angle_analyzer.calculate_knee_angle(
+                landmarks_dict, 
+                side=side
+            )
+            
+            if knee_angle is None:
+                return frame, None, None
+            
+            # Obtém as coordenadas dos pontos
+            hip = landmarks_dict[hip_id]
+            knee = landmarks_dict[knee_id]
+            ankle = landmarks_dict[ankle_id]
+            
+            # Determina a cor com base na pontuação
+            if score == 1:
+                color = (0, 255, 0)  # Verde (160° a 180°)
+            elif score == 2:
+                color = (0, 255, 255)  # Amarelo (45° a 80° ou outros ângulos)
+            else:  # score == 3
+                color = (0, 0, 255)  # Vermelho (<45°)
+            
+            # Desenha a linha da coxa com a cor determinada pela pontuação
+            cv2.line(
+                frame,
+                hip,
+                knee,
+                color,
+                thickness=4
+            )
+            
+            # Desenha a linha da perna com a cor determinada pela pontuação
+            cv2.line(
+                frame,
+                knee,
+                ankle,
+                color,
+                thickness=4
+            )
+            
+            # Desenha círculos nos pontos
+            cv2.circle(
+                frame,
+                hip,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            cv2.circle(
+                frame,
+                knee,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            cv2.circle(
+                frame,
+                ankle,
+                radius=5,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            return frame, knee_angle, score
+            
+        except Exception as e:
+            print(f"Erro ao desenhar ângulo do joelho: {str(e)}")
+            return frame, None, None
+    
     def apply_face_blur(self, frame, face_landmarks=None, eye_landmarks=None):
         """
         Aplica tarja no rosto usando landmarks faciais ou dos olhos.

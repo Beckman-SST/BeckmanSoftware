@@ -1,6 +1,7 @@
 import cv2
 import os
 import time
+import cv2
 import numpy as np
 import mediapipe as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -401,6 +402,30 @@ class VideoProcessor:
                         pose_landmarks,
                         use_vertical_reference=True
                     )
+                
+                # Calcula e desenha o ângulo do joelho para ambos os lados
+                if self.config.get('show_lower_body', True):
+                    # Verifica se temos landmarks suficientes para calcular o ângulo do joelho direito
+                    right_knee_landmarks_available = all(lm_id in pose_landmarks for lm_id in [24, 26, 28])
+                    
+                    if right_knee_landmarks_available:
+                        # Desenha o ângulo do joelho direito
+                        frame, right_knee_angle, right_knee_score = self.video_visualizer.draw_knee_angle(
+                            frame,
+                            pose_landmarks,
+                            side='right'
+                        )
+                    
+                    # Verifica se temos landmarks suficientes para calcular o ângulo do joelho esquerdo
+                    left_knee_landmarks_available = all(lm_id in pose_landmarks for lm_id in [23, 25, 27])
+                    
+                    if left_knee_landmarks_available:
+                        # Desenha o ângulo do joelho esquerdo
+                        frame, left_knee_angle, left_knee_score = self.video_visualizer.draw_knee_angle(
+                            frame,
+                            pose_landmarks,
+                            side='left'
+                        )
             
             return frame
             

@@ -171,6 +171,7 @@ class AngleAnalyzer:
             
         Returns:
             float: Ângulo do joelho ou None se não for possível calcular
+            int: Pontuação baseada no ângulo (1-3 pontos) segundo critérios de Suzanne Rodgers
         """
         if side == 'right':
             # Quadril, joelho e tornozelo direitos
@@ -181,14 +182,36 @@ class AngleAnalyzer:
         
         # Verifica se todos os landmarks necessários estão disponíveis
         if not all(lm_id in landmarks for lm_id in [hip_id, knee_id, ankle_id]):
-            return None
+            return None, None
         
         # Calcula o ângulo
-        return calculate_angle(
+        knee_angle = calculate_angle(
             landmarks[hip_id],
             landmarks[knee_id],
             landmarks[ankle_id]
         )
+        
+        if knee_angle is None:
+            return None, None
+        
+        # Determina a pontuação com base no ângulo segundo critérios de Suzanne Rodgers
+        # Postura "Verde" (Baixo Esforço - Suzanne Rodgers Nível 1):
+        # Joelhos: Ângulo do joelho (quadril-joelho-tornozelo) entre 160° e 180° (quase reto, de pé ou sentado com pernas esticadas)
+        if 160 <= knee_angle <= 180:
+            score = 1  # Verde (160° a 180°)
+        # Postura "Amarela" (Moderado Esforço - Suzanne Rodgers Nível 2):
+        # Joelhos: Flexão Moderada: Joelho entre 45° e 80° (agachamento leve ou joelhos muito dobrados ao sentar)
+        elif 45 <= knee_angle <= 80:
+            score = 2  # Amarelo (45° a 80°)
+        # Postura "Vermelha" (Alto/Muito Alto Esforço - Suzanne Rodgers Nível 3+):
+        # Joelhos: Flexão profunda (joelho < 45°, indicando agachamento profundo)
+        elif knee_angle < 45:
+            score = 3  # Vermelho (<45°)
+        else:
+            # Outros ângulos (entre 80° e 160°) - consideramos como nível moderado
+            score = 2  # Amarelo (outros ângulos)
+        
+        return knee_angle, score
     
     def calculate_ankle_angle(self, landmarks, side='right'):
         """

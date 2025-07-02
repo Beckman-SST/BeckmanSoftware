@@ -1,6 +1,6 @@
-# Sistema de Processamento de Imagens - Interface Web
+# Sistema de Processamento de Imagens e Vídeos
 
-Este projeto implementa uma interface web com Flask para o sistema de processamento de imagens e vídeos, substituindo a interface desktop anterior enquanto mantém toda a funcionalidade de processamento original.
+Este projeto implementa um sistema de processamento de imagens e vídeos para análise de postura e ergonomia, com uma interface web com Flask que substitui a interface desktop anterior enquanto mantém toda a funcionalidade de processamento original.
 
 ## Funcionalidades
 
@@ -55,3 +55,23 @@ Esta interface web mantém toda a lógica de processamento do código original, 
 - Cálculo de ângulos e posicionamento
 - Ocultação do rosto para privacidade
 - Todas as outras funcionalidades específicas do processamento original
+
+## Documentação
+
+A documentação completa do sistema está disponível no diretório `docs/`. Consulte o [índice da documentação](./docs/README.md) para mais informações.
+
+### Estrutura da Documentação
+
+- [Arquitetura](./docs/arquitetura/README.md): Documentação de arquitetura do sistema
+- [Técnico](./docs/tecnico/README.md): Documentação técnica da implementação
+- [Critérios](./docs/criterios/README.md): Documentação dos critérios de avaliação
+- [Guias](./docs/guias/README.md): Guias de uso e manutenção
+- [API](./docs/api/README.md): Documentação da API do sistema
+
+## Contribuição
+
+Contribuições são bem-vindas! Consulte o [guia de contribuição](./docs/CONTRIBUTING.md) para mais informações.
+
+## Histórico de Alterações
+
+Consulte o [CHANGELOG](./docs/CHANGELOG.md) para ver o histórico de alterações do projeto.

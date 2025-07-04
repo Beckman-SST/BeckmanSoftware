@@ -24,7 +24,6 @@ build/
 *.swo
 
 # Arquivos temporários
-*.log
 *.tmp
 
 # Arquivos de sistema

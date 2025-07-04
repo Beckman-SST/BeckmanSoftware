@@ -6,7 +6,7 @@ Esta pasta contém todos os templates HTML utilizados na aplicação RePosture.
 
 - `index.html` - Página principal da aplicação
 - `config.html` - Página de configurações
-- `logs.html` - Página de gerenciamento de logs
+
 
 ## Organização
 

@@ -5,9 +5,6 @@ import threading
 import subprocess
 import json
 import tempfile
-import glob
-import re
-import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -53,17 +50,8 @@ status_file = os.path.join(tempfile.gettempdir(), 'processamento_status.json')
 arquivo_atual = 0
 total_files = 0
 tempos_processamento = []
-processing_logs = []  # Lista para armazenar os logs do processamento
 
-# Função para adicionar log
-def add_log(message):
-    global processing_logs
-    timestamp = datetime.datetime.now().strftime('%H:%M:%S')
-    log_entry = f'[{timestamp}] {message}'
-    processing_logs.append(log_entry)
-    # Manter apenas os últimos 100 logs
-    if len(processing_logs) > 100:
-        processing_logs = processing_logs[-100:]
+
 
 # Configurações padrão
 default_config = {
@@ -126,24 +114,7 @@ def atualizar_status_processamento(status):
     except Exception as e:
         print(f"Erro ao atualizar status: {e}")
 
-# Função para extrair erros dos logs
-def extract_errors_from_log(log_file):
-    try:
-        # Tenta ler com UTF-8 primeiro, depois fallback para latin-1
-        try:
-            with open(log_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except UnicodeDecodeError:
-            with open(log_file, 'r', encoding='latin-1') as f:
-                content = f.read()
-            
-        # Procura por mensagens de erro no log
-        error_pattern = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} - ERROR - (.+)'
-        errors = re.findall(error_pattern, content)
-        return errors
-    except Exception as e:
-        print(f"Erro ao extrair erros do log: {e}")
-        return []
+
 
 # Função para processar os arquivos em uma thread separada
 # Lista thread-safe para armazenar mensagens de erro
@@ -159,9 +130,6 @@ def processar_arquivos(file_paths, is_operacional=False):
     processamento_ativo = True
     cancelar_processamento = False
     error_messages.clear()  # Limpa mensagens de erro anteriores
-    processing_logs.clear()  # Limpa logs anteriores
-    
-    add_log('Iniciando processamento de arquivos')
     
     # Limpa o arquivo de status
     status_file = os.path.join(tempfile.gettempdir(), 'processamento_status.json')
@@ -177,18 +145,14 @@ def processar_arquivos(file_paths, is_operacional=False):
     tempos_processamento = []
     arquivo_atual = 0
     tempo_inicio = time.time()
-    
-    add_log(f'Total de arquivos para processar: {total_files}')
 
     for i, file_path in enumerate(file_paths):
         if cancelar_processamento:
-            add_log('Processamento cancelado pelo usuário')
             break
             
         arquivo_atual = i + 1
         arquivo_start_time = time.time()
         filename = os.path.basename(file_path)
-        log_messages = []  # Lista para agrupar mensagens de log do arquivo atual
         
         # Atualiza status
         atualizar_status_processamento({
@@ -199,17 +163,13 @@ def processar_arquivos(file_paths, is_operacional=False):
         try:
             # Verifica se é um arquivo de vídeo
             if file_path.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
-                log_messages.append('Iniciando processamento do vídeo')
                 # Apenas detecção, desenho dos landmarks e salvamento do vídeo
                 success, message = process_video_file(file_path)
                 if not success:
-                    log_messages.append(f'Erro no processamento: {message}')
                     adicionar_erro(message)
                     continue
-                log_messages.append('Vídeo processado com sucesso')
             else:
                 # Processamento de imagens usando o módulo modular
-                log_messages.append('Iniciando processamento da imagem')
                 output_folder = app.config['OUTPUT_FOLDER']
                 processo = subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "modules", "processamento.py"), file_path, "-o", output_folder],
                                           stdout=subprocess.PIPE,
@@ -218,7 +178,6 @@ def processar_arquivos(file_paths, is_operacional=False):
                 while processo.poll() is None:
                     if cancelar_processamento:
                         processo.terminate()
-                        log_messages.append('Processamento interrompido')
                         break
                     time.sleep(0.1)
                 
@@ -228,39 +187,28 @@ def processar_arquivos(file_paths, is_operacional=False):
                     # Verifica o código de retorno do processo
                     if processo.returncode != 0:
                         erro = stderr.decode('utf-8', errors='ignore')
-                        log_messages.append(f'Erro no processamento: {erro}')
                         adicionar_erro(f"Erro ao processar {filename}: {erro}")
-                    else:
-                        log_messages.append('Processamento concluído com sucesso')
             
             # Remove o arquivo de upload após processamento
             try:
                 os.remove(file_path)
             except Exception as e:
-                log_messages.append(f'Erro ao remover arquivo de upload: {str(e)}')
                 print(f"Erro ao remover arquivo {file_path}: {e}")
             
             # Calcula tempo de processamento
             tempo_processamento = time.time() - arquivo_start_time
             tempos_processamento.append(tempo_processamento)
-            log_messages.append(f'Tempo de processamento: {int(tempo_processamento)} segundos')
                 
         except Exception as e:
-            log_messages.append(f'Erro inesperado: {str(e)}')
             adicionar_erro(f"Erro inesperado ao processar {filename}: {str(e)}")
-        
-        # Adiciona todas as mensagens do arquivo atual como um único log
-        add_log(f'Arquivo {arquivo_atual}/{total_files} - {filename}:\n' + '\n'.join(f'  - {msg}' for msg in log_messages))
     
     tempo_total = time.time() - tempo_inicio
-    add_log(f'Processamento finalizado. Tempo total: {int(tempo_total)} segundos')
     
     # Se foi um processamento operacional, restaura a configuração para o valor padrão
     if is_operacional:
         config = load_config()
         config['only_face_blur'] = False
         save_config_to_file(config)
-        add_log('Configuração de processamento operacional restaurada para o padrão')
     
     processamento_ativo = False
     cancelar_processamento = False
@@ -407,14 +355,13 @@ def cancelar():
 # Rota para verificar o status do processamento
 @app.route('/status')
 def status():
-    global arquivo_atual, total_files, tempos_processamento, error_messages, processing_logs
+    global arquivo_atual, total_files, tempos_processamento, error_messages
     
     status_info = {
         'ativo': processamento_ativo,
         'cancelando': cancelar_processamento,
         'erros': error_messages[:],  # Envia uma cópia da lista de erros
-        'arquivos_processados': [],
-        'logs': processing_logs[:]  # Adiciona os logs ao retorno
+        'arquivos_processados': []
     }
     
     # Verifica arquivos já processados na pasta Output
@@ -570,212 +517,10 @@ def unir_imagens():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Função para obter logs do sistema
-def get_log_files():
-    log_folder = "logs"
-    log_files = []
-    
-    if os.path.exists(log_folder):
-        log_files = sorted(glob.glob(os.path.join(log_folder, "*.log")), key=os.path.getmtime, reverse=True)
-    
-    return log_files
 
-# Função para ler o conteúdo de um arquivo de log
-def read_log_file(log_file):
-    try:
-        # Tenta ler com UTF-8 primeiro, depois fallback para latin-1
-        try:
-            with open(log_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except UnicodeDecodeError:
-            with open(log_file, 'r', encoding='latin-1') as f:
-                content = f.read()
-        return content
-    except Exception as e:
-        return f"Erro ao ler arquivo de log: {str(e)}"
 
-# Função para extrair informações de um arquivo de log
-def parse_log_entry(log_file):
-    try:
-        filename = os.path.basename(log_file)
-        match = re.search(r'processamento_(\d{8}_\d{6})\.log', filename)
-        date_str = match.group(1) if match else "Unknown"
-        
-        # Formatar a data para exibição
-        if date_str != "Unknown":
-            date_obj = datetime.datetime.strptime(date_str, '%Y%m%d_%H%M%S')
-            date_str = date_obj.strftime('%d/%m/%Y %H:%M:%S')
-        
-        content = read_log_file(log_file)
-        
-        # Determinar o nível do log com base no conteúdo
-        level = "INFO"
-        if "ERROR" in content:
-            level = "ERROR"
-        elif "WARNING" in content:
-            level = "WARNING"
-        
-        return {
-            'id': filename,
-            'date': date_str,
-            'level': level,
-            'content': content,
-            'path': log_file
-        }
-    except Exception as e:
-        return {
-            'id': os.path.basename(log_file),
-            'date': 'Erro',
-            'level': 'ERROR',
-            'content': f"Erro ao processar arquivo de log: {str(e)}",
-            'path': log_file
-        }
 
-# Rota para a página de logs
-@app.route('/logs')
-def logs():
-    page = request.args.get('page', 1, type=int)
-    per_page = 10  # Logs por página
-    
-    # Obtém os logs do processamento atual
-    current_logs = [{
-        'id': 'current_processing',
-        'date': datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
-        'level': 'INFO',
-        'content': '\n'.join(processing_logs)
-    }] if processing_logs else []
-    
-    # Obtém os logs dos arquivos
-    log_files = get_log_files()
-    file_logs = [parse_log_entry(log_file) for log_file in log_files]
-    
-    # Combina os logs atuais com os logs dos arquivos
-    all_logs = current_logs + file_logs
-    
-    # Calcula a paginação
-    total_logs = len(all_logs)
-    total_pages = (total_logs + per_page - 1) // per_page
-    start = (page - 1) * per_page
-    end = start + per_page
-    
-    # Obtém os logs da página atual
-    logs_page = all_logs[start:end]
-    
-    return render_template('logs.html',
-                          logs=logs_page,
-                          page=page,
-                          total_pages=total_pages,
-                          active_page='logs')
 
-# Rota para excluir um log específico
-@app.route('/delete_log', methods=['POST'])
-def delete_log():
-    log_id = request.form.get('log_id')
-    log_path = os.path.join('logs', log_id)
-    
-    if os.path.exists(log_path):
-        try:
-            os.remove(log_path)
-            flash('Log excluído com sucesso!', 'success')
-        except Exception as e:
-            flash(f'Erro ao excluir log: {str(e)}', 'error')
-    else:
-        flash('Arquivo de log não encontrado.', 'error')
-    
-    return redirect(url_for('logs'))
-
-# Rota para excluir logs selecionados
-@app.route('/delete_selected_logs', methods=['POST'])
-def delete_selected_logs():
-    selected_logs = request.form.get('selected_logs')
-    
-    if selected_logs:
-        try:
-            log_ids = json.loads(selected_logs)
-            deleted_count = 0
-            
-            for log_id in log_ids:
-                log_path = os.path.join('logs', log_id)
-                if os.path.exists(log_path):
-                    os.remove(log_path)
-                    deleted_count += 1
-            
-            if deleted_count > 0:
-                flash(f'{deleted_count} logs excluídos com sucesso!', 'success')
-            else:
-                flash('Nenhum log foi excluído.', 'warning')
-        except Exception as e:
-            flash(f'Erro ao excluir logs: {str(e)}', 'error')
-    else:
-        flash('Nenhum log selecionado.', 'warning')
-    
-    return redirect(url_for('logs'))
-
-# Rota para excluir todos os logs
-@app.route('/delete_all_logs', methods=['POST'])
-def delete_all_logs():
-    log_folder = "logs"
-    
-    if os.path.exists(log_folder):
-        try:
-            log_files = glob.glob(os.path.join(log_folder, "*.log"))
-            deleted_count = 0
-            
-            for log_file in log_files:
-                os.remove(log_file)
-                deleted_count += 1
-            
-            if deleted_count > 0:
-                flash(f'Todos os {deleted_count} logs foram excluídos com sucesso!', 'success')
-            else:
-                flash('Não havia logs para excluir.', 'info')
-        except Exception as e:
-            flash(f'Erro ao excluir todos os logs: {str(e)}', 'error')
-    else:
-        flash('Pasta de logs não encontrada.', 'error')
-    
-    return redirect(url_for('logs'))
-
-# Rota para excluir logs por intervalo
-@app.route('/delete_logs_range', methods=['POST'])
-def delete_logs_range():
-    start_index = request.form.get('start_index', type=int)
-    end_index = request.form.get('end_index', type=int)
-    
-    if start_index and end_index:
-        try:
-            log_files = get_log_files()
-            
-            # Ajustar índices para base 0
-            start_idx = start_index - 1
-            end_idx = end_index - 1
-            
-            # Validar índices
-            if start_idx < 0:
-                start_idx = 0
-            if end_idx >= len(log_files):
-                end_idx = len(log_files) - 1
-            
-            if start_idx <= end_idx and start_idx < len(log_files):
-                logs_to_delete = log_files[start_idx:end_idx+1]
-                deleted_count = 0
-                
-                for log_file in logs_to_delete:
-                    os.remove(log_file)
-                    deleted_count += 1
-                
-                if deleted_count > 0:
-                    flash(f'{deleted_count} logs excluídos com sucesso!', 'success')
-                else:
-                    flash('Nenhum log foi excluído.', 'warning')
-            else:
-                flash('Intervalo de logs inválido.', 'error')
-        except Exception as e:
-            flash(f'Erro ao excluir logs por intervalo: {str(e)}', 'error')
-    else:
-        flash('Parâmetros inválidos.', 'error')
-    
-    return redirect(url_for('logs'))
 
 if __name__ == '__main__':
     port = 5000

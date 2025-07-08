@@ -438,9 +438,9 @@ def abrir_pasta_merge():
             subprocess.Popen(['open', merge_path] if sys.platform == 'darwin' else ['xdg-open', merge_path])
     return {'success': True, 'path': merge_path}
 
-# Rota para a página de relatório
-@app.route('/relatorio')
-def relatorio():
+# Rota para a página de colagem
+@app.route('/colagem')
+def colagem():
     processed_files = []
     if os.path.exists(app.config['OUTPUT_FOLDER']):
         # Filtra apenas arquivos de imagem e vídeo, excluindo arquivos de erro
@@ -449,7 +449,7 @@ def relatorio():
                         if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f)) 
                         and not f.startswith('error_')
                         and f.lower().endswith(valid_extensions)]
-    return render_template('relatorio.html', processed_files=processed_files)
+    return render_template('colagem.html', processed_files=processed_files)
 
 # Rota para unir imagens selecionadas
 # Rota para servir arquivos da pasta Merge

@@ -5,7 +5,7 @@ import threading
 import subprocess
 import json
 import tempfile
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, send_file
 from werkzeug.utils import secure_filename
 from PIL import Image
 import uuid
@@ -24,7 +24,7 @@ def process_video_file(input_path):
         return False, f"Erro durante o processamento do vídeo: {str(e)}"
 
 # Configurações da aplicação
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend/public', static_url_path='')
 app.config['SECRET_KEY'] = 'beckman_project_secret_key'
 app.config['UPLOAD_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'uploads'))
 app.config['OUTPUT_FOLDER'] = os.path.abspath(os.path.join(os.path.dirname(__file__), 'modules', 'data', 'output'))
@@ -223,142 +223,187 @@ def get_errors():
 
 @app.route('/')
 def index():
-    # Lista os arquivos processados
-    processed_files = []
-    error_files = []
-    
-    # Exibe erros acumulados, se houver
-    for error in error_messages:
-        flash(error, 'error')
-    error_messages.clear()
-    
-    if os.path.exists(app.config['OUTPUT_FOLDER']):
-        # Filtra apenas arquivos de imagem e vídeo, excluindo arquivos como __init__.py
-        valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.mp4', '.avi', '.mov', '.mkv')
-        all_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER']) 
-                    if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f)) 
-                    and f.lower().endswith(valid_extensions)]
-        
-        # Separa os arquivos de erro dos arquivos processados normalmente
-        for f in all_files:
-            if f.startswith('error_'):
-                error_files.append(f)
-            else:
-                processed_files.append(f)
-    
-    return render_template('index.html', processed_files=processed_files, error_files=error_files)
+    return send_from_directory(app.static_folder, 'index.html')
 
-# Rota para a página de configurações
-@app.route('/config')
-def config():
-    # Carrega as configurações atuais
-    current_config = load_config()
-    return render_template('config.html', config=current_config)
+# API para carregar configurações
+@app.route('/api/config', methods=['GET'])
+def get_config():
+    try:
+        current_config = load_config()
+        return jsonify({
+            'success': True,
+            'config': current_config
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para salvar configurações
-@app.route('/save_config', methods=['POST'])
+# API para salvar configurações
+@app.route('/api/config', methods=['POST'])
 def save_config():
-    # Obtém as configurações do formulário
-    new_config = {
-        'min_detection_confidence': float(request.form.get('min_detection_confidence', default_config['min_detection_confidence'])),
-        'min_tracking_confidence': float(request.form.get('min_tracking_confidence', default_config['min_tracking_confidence'])),
-        'yolo_confidence': float(request.form.get('yolo_confidence', default_config['yolo_confidence'])),
-        'moving_average_window': int(request.form.get('moving_average_window', default_config['moving_average_window'])),
-        'show_face_blur': 'show_face_blur' in request.form,
-        'show_electronics': 'show_electronics' in request.form,
-        'show_angles': 'show_angles' in request.form,
-        'show_upper_body': 'show_upper_body' in request.form,
-        'show_lower_body': 'show_lower_body' in request.form,
-        'process_lower_body': 'process_lower_body' in request.form,
-        'only_face_blur': 'only_face_blur' in request.form,  # Nova opção para processar apenas com tarja facial
-        'resize_width': int(request.form.get('resize_width', default_config['resize_width']))
-    }
-    
-    # Salva as configurações
-    if save_config_to_file(new_config):
-        flash('Configurações salvas com sucesso!', 'success')
-    else:
-        flash('Erro ao salvar configurações.', 'error')
-    
-    return redirect(url_for('config'))
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Dados de configuração não fornecidos'
+            }), 400
+        
+        # Valida e processa as configurações
+        new_config = {
+            'min_detection_confidence': float(data.get('min_detection_confidence', default_config['min_detection_confidence'])),
+            'min_tracking_confidence': float(data.get('min_tracking_confidence', default_config['min_tracking_confidence'])),
+            'yolo_confidence': float(data.get('yolo_confidence', default_config['yolo_confidence'])),
+            'moving_average_window': int(data.get('moving_average_window', default_config['moving_average_window'])),
+            'show_face_blur': bool(data.get('show_face_blur', False)),
+            'show_electronics': bool(data.get('show_electronics', False)),
+            'show_angles': bool(data.get('show_angles', False)),
+            'show_upper_body': bool(data.get('show_upper_body', False)),
+            'show_lower_body': bool(data.get('show_lower_body', False)),
+            'process_lower_body': bool(data.get('process_lower_body', False)),
+            'only_face_blur': bool(data.get('only_face_blur', False)),
+            'resize_width': int(data.get('resize_width', default_config['resize_width']))
+        }
+        
+        # Salva as configurações
+        if save_config_to_file(new_config):
+            return jsonify({
+                'success': True,
+                'message': 'Configurações salvas com sucesso!'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao salvar configurações'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para upload de arquivos
-@app.route('/upload', methods=['POST'])
+# API para upload de arquivos
+@app.route('/api/upload', methods=['POST'])
 def upload_file():
     global processamento_ativo
     
-    if processamento_ativo:
-        flash('Já existe um processamento em andamento. Aguarde a conclusão.', 'warning')
-        return redirect(url_for('index'))
-    
-    # Verifica se há arquivos no request
-    if 'files' not in request.files:
-        flash('Nenhum arquivo selecionado', 'error')
-        return redirect(url_for('index'))
-    
-    files = request.files.getlist('files')
-    
-    # Verifica se algum arquivo foi selecionado
-    if not files or files[0].filename == '':
-        flash('Nenhum arquivo selecionado', 'error')
-        return redirect(url_for('index'))
-    
-    # Verifica se é um processamento operacional
-    is_operacional = 'processing_type' in request.form and request.form['processing_type'] == 'operacional'
-    
-    # Se for processamento operacional, atualiza a configuração para usar apenas tarja facial
-    if is_operacional:
-        config = load_config()
-        config['only_face_blur'] = True
-        save_config_to_file(config)
-    
-    # Lista para armazenar os caminhos dos arquivos válidos
-    valid_files = []
-    
-    for file in files:
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            try:
-                file.save(file_path)
-                valid_files.append(file_path)
-            except Exception as e:
-                print(f"Erro ao salvar arquivo {filename}: {e}")
-                flash(f'Erro ao salvar arquivo {filename}: {e}', 'error')
-        else:
-            flash(f'Arquivo {file.filename} não permitido. Use apenas imagens (jpg, jpeg, png) ou vídeos (mp4, avi).', 'error')
-    
-    if valid_files:
-        # Inicia o processamento em uma thread separada
-        threading.Thread(target=processar_arquivos, args=(valid_files, is_operacional)).start()
+    try:
+        if processamento_ativo:
+            return jsonify({
+                'success': False,
+                'error': 'Já existe um processamento em andamento. Aguarde a conclusão.'
+            }), 400
         
+        # Verifica se há arquivos no request
+        if 'files' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum arquivo selecionado'
+            }), 400
+        
+        files = request.files.getlist('files')
+        
+        # Verifica se algum arquivo foi selecionado
+        if not files or files[0].filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum arquivo selecionado'
+            }), 400
+        
+        # Verifica o tipo de processamento
+        processing_type = request.form.get('processing_type', 'executivo')
+        is_operacional = processing_type == 'operacional'
+        is_videos = processing_type == 'videos'
+        
+        # Se for processamento operacional, atualiza a configuração para usar apenas tarja facial
         if is_operacional:
-            flash(f'{len(valid_files)} arquivo(s) enviado(s) para processamento operacional com tarja facial.', 'success')
+            config = load_config()
+            config['only_face_blur'] = True
+            save_config_to_file(config)
+        # Se for processamento de vídeos, pode ter configurações específicas no futuro
+        elif is_videos:
+            # Configurações específicas para processamento de vídeos podem ser adicionadas aqui
+            pass
+        
+        # Lista para armazenar os caminhos dos arquivos válidos
+        valid_files = []
+        errors = []
+        
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                try:
+                    file.save(file_path)
+                    valid_files.append(file_path)
+                except Exception as e:
+                    errors.append(f'Erro ao salvar arquivo {filename}: {e}')
+            else:
+                errors.append(f'Arquivo {file.filename} não permitido. Use apenas imagens (jpg, jpeg, png) ou vídeos (mp4, avi).')
+        
+        if valid_files:
+            # Inicia o processamento em uma thread separada
+            threading.Thread(target=processar_arquivos, args=(valid_files, is_operacional)).start()
+            
+            message = f'{len(valid_files)} arquivo(s) enviado(s) para processamento'
+            if is_operacional:
+                message += ' operacional com tarja facial'
+            elif is_videos:
+                message += ' de vídeos'
+            
+            return jsonify({
+                'success': True,
+                'message': message,
+                'files_count': len(valid_files),
+                'errors': errors
+            })
         else:
-            flash(f'{len(valid_files)} arquivo(s) enviado(s) para processamento.', 'success')
-    
-    return redirect(url_for('index'))
+            return jsonify({
+                'success': False,
+                'error': 'Nenhum arquivo válido foi enviado',
+                'errors': errors
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para cancelar o processamento
-@app.route('/cancelar', methods=['POST'])
+# API para cancelar o processamento
+@app.route('/api/cancel', methods=['POST'])
 def cancelar():
     global cancelar_processamento
     
-    if processamento_ativo:
-        cancelar_processamento = True
-        flash('Solicitação de cancelamento enviada. Aguarde...', 'info')
-    else:
-        flash('Não há processamento ativo para cancelar', 'warning')
-    
-    return redirect(url_for('index'))
+    try:
+        if processamento_ativo:
+            cancelar_processamento = True
+            return jsonify({
+                'success': True,
+                'message': 'Solicitação de cancelamento enviada. Aguarde...'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Não há processamento ativo para cancelar'
+            }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para verificar o status do processamento
-@app.route('/status')
+# API para verificar o status do processamento
+@app.route('/api/status')
 def status():
     global arquivo_atual, total_files, tempos_processamento, error_messages
     
     status_info = {
         'ativo': processamento_ativo,
+        'processing': processamento_ativo,  # Compatibilidade com frontend antigo
         'cancelando': cancelar_processamento,
         'erros': error_messages[:],  # Envia uma cópia da lista de erros
         'arquivos_processados': []
@@ -396,74 +441,153 @@ def status():
 def output_file(filename):
     return send_from_directory(app.config['OUTPUT_FOLDER'], filename)
 
-# Rota para limpar os arquivos processados
-@app.route('/limpar', methods=['POST'])
+# API para limpar os arquivos temporários
+@app.route('/api/cleanup', methods=['POST'])
 def limpar():
-    if processamento_ativo:
-        flash('Não é possível limpar enquanto há um processamento em andamento', 'warning')
-        return redirect(url_for('index'))
-    
-    # Limpa a pasta de uploads
-    for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.isfile(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                print(f"Erro ao remover arquivo temporário {file_path}: {e}")
-                flash(f'Erro ao remover arquivo temporário {filename}: {e}', 'error')
-    
-    flash('Arquivos temporários removidos com sucesso', 'success')
-    return redirect(url_for('index'))
+    try:
+        if processamento_ativo:
+            return jsonify({
+                'success': False,
+                'error': 'Não é possível limpar enquanto há um processamento em andamento'
+            }), 400
+        
+        errors = []
+        removed_count = 0
+        
+        # Limpa a pasta de uploads
+        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                    removed_count += 1
+                except Exception as e:
+                    errors.append(f'Erro ao remover arquivo temporário {filename}: {e}')
+        
+        return jsonify({
+            'success': True,
+            'message': f'Arquivos temporários removidos com sucesso ({removed_count} arquivos)',
+            'removed_count': removed_count,
+            'errors': errors
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para abrir a pasta de output
-@app.route('/abrir-pasta')
+# API para abrir a pasta de output
+@app.route('/api/open-folder')
 def abrir_pasta():
-    output_path = os.path.abspath(app.config['OUTPUT_FOLDER'])
-    if os.path.exists(output_path):
-        if os.name == 'nt':  # Windows
-            os.startfile(output_path)
-        elif os.name == 'posix':  # macOS e Linux
-            subprocess.Popen(['open', output_path] if sys.platform == 'darwin' else ['xdg-open', output_path])
-    return {'success': True, 'path': output_path}
+    try:
+        output_path = os.path.abspath(app.config['OUTPUT_FOLDER'])
+        if os.path.exists(output_path):
+            if os.name == 'nt':  # Windows
+                os.startfile(output_path)
+            elif os.name == 'posix':  # macOS e Linux
+                subprocess.Popen(['open', output_path] if sys.platform == 'darwin' else ['xdg-open', output_path])
+            return jsonify({'success': True, 'path': output_path})
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Pasta de saída não encontrada'
+            }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para abrir a pasta de merge
-@app.route('/abrir-pasta-merge')
-def abrir_pasta_merge():
-    merge_path = os.path.abspath(app.config['MERGE_FOLDER'])
-    if os.path.exists(merge_path):
-        if os.name == 'nt':  # Windows
-            os.startfile(merge_path)
-        elif os.name == 'posix':  # macOS e Linux
-            subprocess.Popen(['open', merge_path] if sys.platform == 'darwin' else ['xdg-open', merge_path])
-    return {'success': True, 'path': merge_path}
+# API para listar arquivos processados
+@app.route('/api/files')
+def list_files():
+    try:
+        processed_images = []
+        processed_videos = []
+        error_files = []
+        
+        if os.path.exists(app.config['OUTPUT_FOLDER']):
+            image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+            video_extensions = ('.mp4', '.avi', '.mov', '.mkv')
+            all_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER'])
+                         if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f))]
+            
+            for f in all_files:
+                file_path = os.path.join(app.config['OUTPUT_FOLDER'], f)
+                file_stats = os.stat(file_path)
+                file_info = {
+                    'name': f,
+                    'size': file_stats.st_size,
+                    'modified': file_stats.st_mtime,
+                    'url': url_for('output_file', filename=f)
+                }
+                
+                if f.startswith('error_'):
+                    error_files.append(file_info)
+                elif f.lower().endswith(image_extensions):
+                    processed_images.append(file_info)
+                elif f.lower().endswith(video_extensions):
+                    processed_videos.append(file_info)
+        
+        return jsonify({
+            'success': True,
+            'images': processed_images,
+            'videos': processed_videos,
+            'errors': error_files,
+            'total': len(processed_images) + len(processed_videos) + len(error_files)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para a página de colagem
-@app.route('/colagem')
-def colagem():
-    processed_files = []
-    if os.path.exists(app.config['OUTPUT_FOLDER']):
-        # Filtra apenas arquivos de imagem e vídeo, excluindo arquivos de erro
-        valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.mp4', '.avi', '.mov', '.mkv')
-        processed_files = [f for f in os.listdir(app.config['OUTPUT_FOLDER']) 
-                        if os.path.isfile(os.path.join(app.config['OUTPUT_FOLDER'], f)) 
-                        and not f.startswith('error_')
-                        and f.lower().endswith(valid_extensions)]
-    return render_template('colagem.html', processed_files=processed_files)
+# API para obter URL de arquivo
+@app.route('/api/file-url/<filename>')
+def get_file_url(filename):
+    try:
+        file_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
+        if os.path.exists(file_path):
+            return jsonify({
+                'success': True,
+                'url': url_for('output_file', filename=filename),
+                'filename': filename
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Arquivo não encontrado'
+            }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-# Rota para unir imagens selecionadas
-# Rota para servir arquivos da pasta Merge
-@app.route('/merge/<filename>')
-def merge_file(filename):
-    return send_from_directory(app.config['MERGE_FOLDER'], filename)
+# API para verificar saúde do servidor
+@app.route('/api/health')
+def health_check():
+    return jsonify({
+        'success': True,
+        'status': 'healthy',
+        'processing_active': processamento_ativo,
+        'timestamp': time.time()
+    })
 
-@app.route('/unir_imagens', methods=['POST'])
+# API para união de imagens
+@app.route('/api/merge-images', methods=['POST'])
 def unir_imagens():
     try:
         # Recebe a lista de imagens selecionadas
-        imagens = request.json.get('imagens', [])
+        data = request.get_json()
+        if not data or 'images' not in data:
+            return jsonify({'success': False, 'error': 'Lista de imagens não fornecida'}), 400
+            
+        imagens = data.get('images', [])
         if len(imagens) < 2:
-            return jsonify({'error': 'Selecione pelo menos duas imagens'}), 400
+            return jsonify({'success': False, 'error': 'Selecione pelo menos duas imagens'}), 400
 
         # Lista para armazenar as imagens carregadas
         images = []
@@ -482,7 +606,7 @@ def unir_imagens():
             total_width += img.size[0]
 
         if not images:
-            return jsonify({'error': 'Nenhuma imagem válida encontrada'}), 400
+            return jsonify({'success': False, 'error': 'Nenhuma imagem válida encontrada'}), 400
 
         # Cria uma nova imagem com as dimensões calculadas
         result = Image.new('RGB', (total_width, max_height))
@@ -515,7 +639,12 @@ def unir_imagens():
         })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Rota para servir arquivos da pasta Merge
+@app.route('/merge/<filename>')
+def merge_file(filename):
+    return send_from_directory(app.config['MERGE_FOLDER'], filename)
 
 
 

@@ -1,0 +1,468 @@
+/* ===== RESPONSIVE DESIGN ===== */
+
+/* Extra Large Devices (1400px and up) */
+@media (min-width: 1400px) {
+    .container-fluid {
+        max-width: 1320px;
+        margin: 0 auto;
+    }
+    
+    .gallery {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+    
+    .file-preview-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+/* Large Devices (992px and up) */
+@media (min-width: 992px) {
+    .main-content {
+        padding-top: 120px;
+    }
+    
+    .card-body {
+        padding: 2.5rem;
+    }
+    
+    .upload-area {
+        padding: 4rem 3rem;
+    }
+    
+    .upload-icon {
+        font-size: 5rem;
+    }
+}
+
+/* Medium Devices (768px and up) */
+@media (min-width: 768px) {
+    .navbar-nav {
+        flex-direction: row;
+    }
+    
+    .nav-link {
+        margin: 0 0.5rem;
+    }
+    
+    .flash-container {
+        right: 30px;
+        max-width: 450px;
+    }
+    
+    .upload-actions {
+        justify-content: flex-end;
+    }
+    
+    .results-actions {
+        flex-wrap: nowrap;
+    }
+}
+
+/* Small Devices (576px and up) */
+@media (min-width: 576px) {
+    .gallery {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+    
+    .file-preview-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+    
+    .status-metric {
+        margin-bottom: 0;
+    }
+}
+
+/* Mobile Devices (575px and down) */
+@media (max-width: 575.98px) {
+    .main-content {
+        padding-top: 90px;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .navbar {
+        padding: 0.5rem 0;
+    }
+    
+    .navbar-brand {
+        font-size: 1.25rem;
+    }
+    
+    .logo-icon {
+        width: 35px;
+        height: 35px;
+        font-size: 1rem;
+    }
+    
+    .card {
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-header {
+        padding: 1rem 1.5rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .card-title {
+        font-size: 1.1rem;
+    }
+    
+    .upload-area {
+        padding: 2rem 1rem;
+    }
+    
+    .upload-icon {
+        font-size: 3rem;
+    }
+    
+    .upload-area h5 {
+        font-size: 1.1rem;
+    }
+    
+    .gallery {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .gallery-item img,
+    .gallery-item video {
+        height: 150px;
+    }
+    
+    .file-preview-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .preview-item img,
+    .preview-item video {
+        height: 100px;
+    }
+    
+    .flash-container {
+        top: 70px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    
+    .btn {
+        padding: 0.6rem 1.25rem;
+        font-size: 0.9rem;
+    }
+    
+    .upload-actions {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .upload-actions .btn {
+        width: 100%;
+    }
+    
+    .results-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .results-actions .btn {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .status-metric {
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+    }
+    
+    .metric-value {
+        font-size: 1.25rem;
+    }
+    
+    .metric-label {
+        font-size: 0.8rem;
+    }
+    
+    .modal-dialog {
+        margin: 1rem;
+    }
+    
+    .modal-header {
+        padding: 1rem 1.5rem;
+    }
+    
+    .modal-title {
+        font-size: 1.1rem;
+    }
+    
+    .section-title {
+        font-size: 2rem;
+    }
+    
+    .section-subtitle {
+        font-size: 1rem;
+    }
+    
+    .empty-state {
+        padding: 2rem 1rem;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+    }
+    
+    .supported-formats {
+        margin-top: 0.75rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    .supported-formats small {
+        font-size: 0.75rem;
+    }
+}
+
+/* Extra Small Devices (480px and down) */
+@media (max-width: 479.98px) {
+    .main-content {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    .card-header {
+        padding: 0.75rem 1rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .upload-area {
+        padding: 1.5rem 0.75rem;
+    }
+    
+    .upload-icon {
+        font-size: 2.5rem;
+    }
+    
+    .upload-area h5 {
+        font-size: 1rem;
+    }
+    
+    .gallery {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+    }
+    
+    .gallery-item img,
+    .gallery-item video {
+        height: 120px;
+    }
+    
+    .file-preview-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+    
+    .preview-item img,
+    .preview-item video {
+        height: 80px;
+    }
+    
+    .preview-overlay {
+        padding: 0.75rem 0.25rem 0.25rem;
+        font-size: 0.7rem;
+    }
+    
+    .gallery-overlay {
+        padding: 1.5rem 0.75rem 0.75rem;
+    }
+    
+    .gallery-overlay h6 {
+        font-size: 0.8rem;
+    }
+    
+    .gallery-overlay p {
+        font-size: 0.7rem;
+    }
+    
+    .error-badge,
+    .success-badge {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.7rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .status-metric {
+        padding: 0.5rem;
+    }
+    
+    .metric-value {
+        font-size: 1.1rem;
+    }
+    
+    .metric-label {
+        font-size: 0.75rem;
+    }
+    
+    .flash-container {
+        top: 60px;
+        right: 5px;
+        left: 5px;
+    }
+    
+    .alert {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-header {
+        padding: 0.75rem 1rem;
+    }
+    
+    .modal-title {
+        font-size: 1rem;
+    }
+}
+
+/* Landscape Orientation for Mobile */
+@media (max-width: 767.98px) and (orientation: landscape) {
+    .main-content {
+        padding-top: 80px;
+    }
+    
+    .upload-area {
+        padding: 1.5rem 2rem;
+    }
+    
+    .upload-icon {
+        font-size: 2.5rem;
+    }
+    
+    .gallery-item img,
+    .gallery-item video {
+        height: 120px;
+    }
+    
+    .preview-item img,
+    .preview-item video {
+        height: 80px;
+    }
+    
+    .status-metric {
+        padding: 0.5rem;
+    }
+}
+
+/* High DPI Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .upload-icon {
+        transform: translateZ(0);
+    }
+    
+    .gallery-item img,
+    .gallery-item video {
+        image-rendering: -webkit-optimize-contrast;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .navbar,
+    .flash-container,
+    .upload-actions,
+    .results-actions,
+    .btn {
+        display: none !important;
+    }
+    
+    .main-content {
+        padding-top: 0;
+    }
+    
+    .card {
+        box-shadow: none;
+        border: 1px solid #dee2e6;
+    }
+    
+    .gallery {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    .spinning {
+        animation: none;
+    }
+    
+    .pulse {
+        animation: none;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --light-color: #212529;
+        --dark-color: #f8f9fa;
+    }
+    
+    body {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        color: var(--dark-color);
+    }
+    
+    .card {
+        background: rgba(33, 37, 41, 0.95);
+        color: var(--dark-color);
+    }
+    
+    .upload-area {
+        background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+        border-color: #6c757d;
+        color: var(--dark-color);
+    }
+    
+    .upload-area:hover {
+        background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
+    }
+    
+    .preview-item,
+    .gallery-item {
+        background: #343a40;
+    }
+    
+    .status-metric {
+        background: rgba(108, 117, 125, 0.2);
+    }
+    
+    .empty-state {
+        color: #adb5bd;
+    }
+    
+    .modal-content {
+        background: #212529;
+        color: var(--dark-color);
+    }
+}

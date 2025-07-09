@@ -72,28 +72,25 @@
     font-weight: 600;
 }
 
-.header-icons {
+.header-actions {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
 }
 
-.header-icons .btn {
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background-color: #f8f9fa;
-    color: #6c757d;
+.header-actions .btn {
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 500;
+    font-size: 0.875rem;
     transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
 }
 
-.header-icons .btn:hover {
-    background-color: #e9ecef;
-    color: #495057;
+.header-actions .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
 .content-area {

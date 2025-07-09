@@ -84,8 +84,8 @@ class RePostureApp {
         this.elements.clearTempBtn?.addEventListener('click', () => this.clearTempFiles());
         this.elements.cancelProcessingBtn?.addEventListener('click', () => this.cancelProcessing());
 
-        // Header icon buttons
-        document.querySelectorAll('.header-icons .btn').forEach(btn => {
+        // Header action buttons
+        document.querySelectorAll('.header-actions .btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const title = e.currentTarget.getAttribute('title');
                 if (title === 'Configurações') {

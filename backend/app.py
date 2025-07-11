@@ -55,12 +55,12 @@ tempos_processamento = []
 
 # Configurações padrão
 default_config = {
-    'min_detection_confidence': 0.80,
-    'min_tracking_confidence': 0.80,
-    'yolo_confidence': 0.65,
+    'min_detection_confidence': 0.70,
+    'min_tracking_confidence': 0.60,
+    'yolo_confidence': 0.50,
     'moving_average_window': 5,
     'show_face_blur': True,
-    'show_electronics': True,
+    'show_electronics': False,
     'show_angles': True,
     'show_upper_body': True,
     'show_lower_body': True,
@@ -277,6 +277,29 @@ def save_config():
             return jsonify({
                 'success': False,
                 'error': 'Erro ao salvar configurações'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# API para resetar configurações para valores padrão de fábrica
+@app.route('/api/config/reset', methods=['POST'])
+def reset_config():
+    try:
+        # Salva as configurações padrão de fábrica
+        if save_config_to_file(default_config.copy()):
+            return jsonify({
+                'success': True,
+                'message': 'Configurações resetadas para valores padrão de fábrica!',
+                'config': default_config
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Erro ao resetar configurações'
             }), 500
             
     except Exception as e:

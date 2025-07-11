@@ -89,7 +89,7 @@ class RePostureApp {
             btn.addEventListener('click', (e) => {
                 const title = e.currentTarget.getAttribute('title');
                 if (title === 'Configurações') {
-                    this.toggleSection('config-section');
+                    window.location.href = 'configuracoes.html';
                 } else if (title === 'Colagem') {
                     this.toggleSection('collage-section');
                 }

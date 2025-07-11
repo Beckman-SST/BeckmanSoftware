@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - RePosture</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <style>
+         .config-section {
+             background: white;
+             padding: 25px;
+             border-radius: 12px;
+             box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+             margin-bottom: 20px;
+             border: 1px solid #e9ecef;
+         }
+         
+         .config-section-title {
+             color: #495057;
+             font-weight: 600;
+             margin-bottom: 20px;
+             padding-bottom: 10px;
+             border-bottom: 2px solid #e9ecef;
+         }
+         
+         .form-range {
+             margin: 10px 0;
+         }
+         
+         .form-range::-webkit-slider-thumb {
+             background: #4e73df;
+         }
+         
+         .form-range::-moz-range-thumb {
+             background: #4e73df;
+             border: none;
+         }
+         
+         .form-check-input:checked {
+             background-color: #4e73df;
+             border-color: #4e73df;
+         }
+         
+         .config-actions {
+             background: white;
+             padding: 20px;
+             border-radius: 12px;
+             box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+             border: 1px solid #e9ecef;
+         }
+         
+         .form-text {
+             font-size: 0.875rem;
+             color: #6c757d;
+         }
+         
+         @media (max-width: 576px) {
+             .config-section {
+                 padding: 15px;
+             }
+             
+             .config-actions {
+                 flex-direction: column;
+             }
+             
+             .config-actions .btn {
+                 margin-bottom: 10px;
+             }
+         }
+     </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-icon">
+                <i class="bi bi-person-check"></i>
+            </div>
+            <h4>RePosture</h4>
+        </div>
+        <ul class="sidebar-menu nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="index.html">
+                    <i class="bi bi-cloud-upload me-2"></i>Upload
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="#">
+                    <i class="bi bi-gear me-2"></i>Configurações
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <!-- Top Header -->
+        <header class="top-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <button class="mobile-menu-btn btn btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h2>Configurações</h2>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-outline-secondary" onclick="window.location.href='index.html'" title="Voltar">
+                    <i class="bi bi-arrow-left me-1"></i>Voltar
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="content-area">
+            <div class="mb-4">
+                <p class="text-muted fs-5">
+                    Nesta seção você pode personalizar as configurações de processamento, 
+                    ajustar parâmetros de análise de postura, definir preferências de saída 
+                    e configurar opções avançadas do sistema.
+                </p>
+            </div>
+            
+            <!-- Configuration Section -->
+            <section id="config-section" class="upload-section">
+                <div class="upload-header">
+                    <h3><i class="bi bi-gear me-2"></i>Configurações do Sistema</h3>
+                </div>
+                <div class="upload-body">
+                    
+                    <!-- Configuration Form -->
+                    <div id="config-container">
+                        <form id="config-form" class="config-form">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="config-section">
+                                        <h6 class="config-section-title">
+                                            <i class="bi bi-sliders me-2"></i>
+                                            Parâmetros de Processamento
+                                        </h6>
+                                        
+                                        <div class="mb-3">
+                                            <label for="min_detection_confidence" class="form-label">
+                                                Confiança Mínima de Detecção
+                                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Define o nível mínimo de confiança necessário para detectar uma pessoa no vídeo. Valores mais altos reduzem falsos positivos, mas podem perder detecções válidas. Recomendado: 0.5-0.8"></i>
+                                                <span class="text-muted" id="min_detection_confidence_value">(0.70)</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="min_detection_confidence" 
+                                                   name="min_detection_confidence" min="0.1" max="1" step="0.05" 
+                                                   value="0.70">
+                                            <div class="form-text">
+                                                Confiança mínima para detectar uma pessoa
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="min_tracking_confidence" class="form-label">
+                                                Confiança Mínima de Rastreamento
+                                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Controla a precisão do rastreamento de poses ao longo do tempo. Valores mais altos garantem maior estabilidade, mas podem perder movimentos sutis. Recomendado: 0.5-0.8"></i>
+                                                <span class="text-muted" id="min_tracking_confidence_value">(0.60)</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="min_tracking_confidence" 
+                                                   name="min_tracking_confidence" min="0.1" max="1" step="0.05" 
+                                                   value="0.60">
+                                            <div class="form-text">
+                                                Confiança mínima para rastrear landmarks
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="yolo_confidence" class="form-label">
+                                                Confiança YOLO
+                                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Threshold de confiança para o modelo YOLO detectar objetos e pessoas. Valores menores detectam mais objetos, mas podem incluir falsos positivos. Recomendado: 0.2-0.7"></i>
+                                                <span class="text-muted" id="yolo_confidence_value">(0.50)</span>
+                                            </label>
+                                            <input type="range" class="form-range" id="yolo_confidence" 
+                                                   name="yolo_confidence" min="0.1" max="1" step="0.05" 
+                                                   value="0.50">
+                                            <div class="form-text">
+                                                Confiança para detecção de objetos
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="moving_average_window" class="form-label">
+                                                Janela de Média Móvel
+                                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Número de frames usados para suavizar os dados de pose e reduzir ruído. Valores maiores criam movimentos mais suaves, mas podem introduzir atraso. Recomendado: 3-7 frames"></i>
+                                            </label>
+                                            <input type="number" class="form-control" id="moving_average_window" 
+                                                   name="moving_average_window" min="1" max="20" 
+                                                   value="5">
+                                            <div class="form-text">
+                                                Número de frames para suavização
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="resize_width" class="form-label">
+                                                Largura de Redimensionamento
+                                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Largura para redimensionar o vídeo durante o processamento. Valores menores aceleram o processamento, mas reduzem a precisão. Valores maiores são mais precisos, mas mais lentos. Recomendado: 640-1280px"></i>
+                                            </label>
+                                            <input type="number" class="form-control" id="resize_width" 
+                                                   name="resize_width" min="320" max="1920" step="10" 
+                                                   value="800">
+                                            <div class="form-text">
+                                                Largura para processamento (pixels)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="config-section">
+                                        <h6 class="config-section-title">
+                                            <i class="bi bi-eye me-2"></i>
+                                            Configurações Visuais
+                                        </h6>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="show_face_blur" 
+                                                       name="show_face_blur" checked>
+                                                <label class="form-check-label" for="show_face_blur">
+                                                    Mostrar Desfoque Facial
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Aplica desfoque automático nos rostos detectados para preservar a privacidade dos indivíduos no vídeo processado."></i>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Aplica desfoque na região do rosto
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="show_electronics" 
+                                                       name="show_electronics">
+                                                <label class="form-check-label" for="show_electronics">
+                                                    Mostrar Eletrônicos
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Detecta e destaca dispositivos eletrônicos (celulares, laptops, etc.) no vídeo para análise de uso de tecnologia."></i>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Detecta e destaca dispositivos eletrônicos
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="show_angles" 
+                                                       name="show_angles" checked>
+                                                <label class="form-check-label" for="show_angles">
+                                                    Mostrar Ângulos
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Exibe medições de ângulos corporais importantes para análise postural, como inclinação da cabeça, curvatura das costas e alinhamento dos ombros."></i>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Exibe ângulos de postura calculados
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="show_upper_body" 
+                                                       name="show_upper_body" checked>
+                                                <label class="form-check-label" for="show_upper_body">
+                                                    Mostrar Corpo Superior
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Ativa a visualização e análise da postura do corpo superior (cabeça, pescoço, ombros, braços e tronco)."></i>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Analisa postura do corpo superior
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="show_lower_body" 
+                                                       name="show_lower_body" checked>
+                                                <label class="form-check-label" for="show_lower_body">
+                                                    Mostrar Corpo Inferior
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Ativa a visualização e análise da postura do corpo inferior (quadris, pernas, joelhos e pés)."></i>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Analisa postura do corpo inferior
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="process_lower_body" 
+                                                       name="process_lower_body" checked>
+                                                <label class="form-check-label" for="process_lower_body">
+                                                    Processar Corpo Inferior
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Inclui o corpo inferior no processamento de análise postural. Desabilitar pode acelerar o processamento se apenas a postura superior for relevante."></i>
+                                                </label>
+                                            </div>
+                                            <div class="form-text">
+                                                Inclui processamento do corpo inferior
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="config-actions mt-4 d-flex gap-2">
+                                <button type="button" id="btn-reset-config" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Restaurar Padrões
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle me-1"></i>Salvar Configurações
+                                </button>
+                                <button type="button" id="btn-load-config" class="btn btn-outline-info">
+                                    <i class="bi bi-download me-1"></i>Carregar Configurações
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal de Confirmação de Reset -->
+    <div class="modal fade" id="resetConfirmModal" tabindex="-1" aria-labelledby="resetConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <div class="d-flex align-items-center">
+                        <div class="me-3">
+                            <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                                <i class="bi bi-exclamation-triangle text-warning fs-4"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <h5 class="modal-title fw-bold" id="resetConfirmModalLabel">Confirmar Reset</h5>
+                            <p class="text-muted mb-0 small">Esta ação não pode ser desfeita</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-2">
+                    <p class="mb-3">Tem certeza de que deseja restaurar todas as configurações para os valores padrão?</p>
+                    <div class="alert alert-warning d-flex align-items-center mb-0" role="alert">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <small>Todas as configurações personalizadas serão perdidas e substituídas pelos valores padrão do sistema.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-warning" id="confirmResetBtn">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Sim, Restaurar Padrões
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/app.js" defer></script>
+    
+    <!-- Configuration Manager -->
+    <script src="js/configuracoes.js"></script>
+     <script>
+         // Inicializar tooltips do Bootstrap
+         document.addEventListener('DOMContentLoaded', function() {
+             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+             var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                 return new bootstrap.Tooltip(tooltipTriggerEl);
+             });
+         });
+     </script>
+ </body>
+ </html>

@@ -302,10 +302,20 @@ class PoseVisualizer:
             color = angle_color
         
         # Formata o texto do ângulo
-        if label:
-            text = f"{label}: {angle:.2f} graus"
-        else:
-            text = f"{angle:.2f} graus"
+        try:
+            # Verifica se o ângulo é um número válido
+            if isinstance(angle, (tuple, list)):
+                print(f"Aviso: ângulo é uma tupla/lista: {angle}")
+                return frame
+            
+            angle_value = float(angle)
+            if label:
+                text = f"{label}: {angle_value:.2f} graus"
+            else:
+                text = f"{angle_value:.2f} graus"
+        except (ValueError, TypeError) as e:
+            print(f"Erro ao formatar ângulo {angle}: {e}")
+            return frame
         
         # Desloca a posição do texto para a direita do ponto da articulação para evitar sobreposição
         offset_x = 20  # Deslocamento horizontal em pixels

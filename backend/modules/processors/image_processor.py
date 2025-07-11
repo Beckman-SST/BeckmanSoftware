@@ -64,9 +64,9 @@ class ImageProcessor:
             # Processa o frame
             processed_frame = self._process_frame(frame, image_path, output_folder, 0)
             
-            # Verifica se o processamento foi bem-sucedido (se o frame foi realmente processado)
-            # Se o frame retornado é igual ao original, significa que houve erro no processamento
-            if processed_frame is frame:
+            # Verifica se o processamento foi bem-sucedido
+            # Se o frame retornado é None, significa que houve erro no processamento
+            if processed_frame is None:
                 # Não salva a imagem normal, apenas o arquivo de erro já foi salvo
                 return True, "Imagem salva como arquivo de erro devido à falha na detecção de landmarks"
             
@@ -121,7 +121,7 @@ class ImageProcessor:
         more_visible_side = self.pose_detector.determine_more_visible_side(landmarks)
         
         # Verifica se deve processar a parte inferior do corpo
-        is_lower_body = self.pose_detector.should_process_lower_body(results) if self.config.get('process_lower_body', True) else False
+        is_lower_body = self.pose_detector.should_process_lower_body(landmarks, results) if self.config.get('process_lower_body', True) else False
         
         # Detecta dispositivos eletrônicos independentemente da opção de exibição
         # A detecção é feita sempre, mas o desenho das caixas depende da configuração 'show_electronics'
@@ -190,7 +190,7 @@ class ImageProcessor:
                 visible_landmarks.landmark[i].visibility = 0
         
         # Calcula os ângulos do joelho e tornozelo
-        knee_angle = self.angle_analyzer.calculate_knee_angle(landmarks, side)
+        knee_angle, knee_score = self.angle_analyzer.calculate_knee_angle(landmarks, side)
         ankle_angle = self.angle_analyzer.calculate_ankle_angle(landmarks, side)
         
         # Desenha os ângulos se a opção estiver habilitada
@@ -349,7 +349,8 @@ class ImageProcessor:
             # Usa a posição dos olhos já definida anteriormente
             if electronics_detections and eye_position:
                 detection = electronics_detections[0]  # Assume que pegamos o eletrônico mais próximo
-                class_name, confidence, (x, y, w, h) = detection  # Coordenadas da caixa do eletrônico
+                class_name, confidence, bbox = detection  # Coordenadas da caixa do eletrônico
+                x, y, w, h = bbox
                 x1, y1 = x, y
                 x2, y2 = x + w, y + h
                 
@@ -383,14 +384,18 @@ class ImageProcessor:
                 
                 # Calcula o ângulo entre as retas
                 from ..core.utils import calculate_angle
-                eye_angle = calculate_angle(prolonged_top, eye_position, prolonged_bottom)
-                
-                # Adiciona o texto do ângulo próximo ao olho se SHOW_ANGLES estiver ativado
-                if self.config.get('show_angles', True):
-                    eye_text = f"{eye_angle:.2f} graus"
-                    text_position = (eye_position[0] + 10, eye_position[1] - 10)  # Posição ligeiramente deslocada do olho
-                    cv2.putText(frame_clean, eye_text, text_position,
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)  # Texto em amarelo/ciano
+                try:
+                    eye_angle = calculate_angle(prolonged_top, eye_position, prolonged_bottom)
+                    
+                    # Adiciona o texto do ângulo próximo ao olho se SHOW_ANGLES estiver ativado
+                    if self.config.get('show_angles', True):
+                        eye_text = f"{eye_angle:.2f} graus"
+                        text_position = (eye_position[0] + 10, eye_position[1] - 10)  # Posição ligeiramente deslocada do olho
+                        cv2.putText(frame_clean, eye_text, text_position,
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)  # Texto em amarelo/ciano
+                except Exception as e:
+                    print(f"Erro ao calcular ângulo dos olhos: {e}")
+                    eye_angle = None
                 
                 # Obtém o centro do primeiro dispositivo eletrônico detectado para o cálculo do ângulo original
                 device_center = self.electronics_detector.get_detection_center(detection)

@@ -126,12 +126,13 @@ class PoseDetector:
         
         return 'left' if left_visible >= right_visible else 'right'
         
-    def should_process_lower_body(self, landmarks):
+    def should_process_lower_body(self, landmarks, results=None):
         """
         Determina se deve processar a parte inferior do corpo com base na visibilidade dos landmarks.
         
         Args:
             landmarks (dict): Dicionário com as coordenadas dos landmarks
+            results: Resultados originais do MediaPipe (opcional)
             
         Returns:
             bool: True se deve processar a parte inferior do corpo, False caso contrário
@@ -141,10 +142,12 @@ class PoseDetector:
         
         # Verifica a visibilidade dos landmarks inferiores usando os valores de visibilidade do MediaPipe
         try:
-            # Obtém os resultados originais do MediaPipe para acessar os valores de visibilidade
-            # Como recebemos landmarks já processados, precisamos acessar os dados originais
-            # Por isso, vamos modificar para receber os resultados originais
-            return self._check_lower_body_visibility(landmarks)
+            # Se temos os resultados originais, usa a verificação baseada em visibilidade
+            if results is not None:
+                return self._check_lower_body_visibility(results)
+            else:
+                # Caso contrário, usa a lógica de fallback baseada na presença dos landmarks
+                return self._fallback_lower_body_check(landmarks)
         except Exception as e:
             # Em caso de erro, usa a lógica de fallback baseada na presença dos landmarks
             return self._fallback_lower_body_check(landmarks)

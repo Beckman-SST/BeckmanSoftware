@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colagem - RePosture</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="../assets/css/main.css">
+    <link rel="stylesheet" href="../assets/css/components.css">
+    <link rel="stylesheet" href="../assets/css/responsive.css">
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <style>
+        .collage-section {
+            padding: 2rem;
+        }
+        
+        .collage-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .collage-header h1 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .collage-description {
+            color: #6c757d;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        
+        .category-section {
+            margin-bottom: 3rem;
+        }
+        
+        .category-title {
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-left: 4px solid #007bff;
+            border-radius: 0.375rem;
+        }
+        
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+        
+        .image-card {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .image-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .image-info {
+            padding: 1rem;
+        }
+        
+        .image-name {
+            font-weight: 500;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            word-break: break-word;
+        }
+        
+        .image-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+        
+        .btn-action {
+            flex: 1;
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8rem;
+            border-radius: 0.25rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6c757d;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+        }
+        
+        .sidebar .nav-link.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-icon">
+                <i class="bi bi-person-check"></i>
+            </div>
+            <h4>RePosture</h4>
+        </div>
+        <ul class="sidebar-menu nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="index.html">
+                    <i class="bi bi-cloud-upload me-2"></i>Upload
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" href="colagem.html">
+                    <i class="bi bi-grid-3x3 me-2"></i>Colagem
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="configuracoes.html">
+                    <i class="bi bi-gear me-2"></i>Configurações
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <!-- Top Header -->
+        <header class="top-header d-flex justify-content-between align-items-center">
+            <div>
+                <button class="mobile-menu-btn btn btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h2>Colagem de Imagens</h2>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-outline-primary me-2" onclick="refreshImages()" title="Atualizar">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Atualizar
+                </button>
+                <button class="btn btn-outline-secondary" onclick="window.location.href='index.html'" title="Voltar">
+                    <i class="bi bi-arrow-left me-1"></i>Voltar
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="content-area">
+            <section class="collage-section">
+                <!-- Header -->
+                <div class="collage-header">
+                    <h1><i class="bi bi-grid-3x3 me-2"></i>Colagem de Imagens Processadas</h1>
+                    <p class="collage-description">
+                        Visualize e organize todas as imagens processadas pelo sistema. 
+                        As imagens são categorizadas por tipo de processamento para facilitar a navegação e seleção.
+                    </p>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingState" class="loading-spinner" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                </div>
+
+                <!-- Executive Images Section -->
+                <div id="executiveSection" class="category-section" style="display: none;">
+                    <h3 class="category-title">
+                        <i class="bi bi-briefcase me-2"></i>Processamento Executivo
+                        <span id="executiveCount" class="badge bg-primary ms-2">0</span>
+                    </h3>
+                    <div id="executiveImages" class="images-grid">
+                        <!-- Executive images will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Operational Images Section -->
+                <div id="operationalSection" class="category-section" style="display: none;">
+                    <h3 class="category-title">
+                        <i class="bi bi-tools me-2"></i>Processamento Operacional (Tarja)
+                        <span id="operationalCount" class="badge bg-success ms-2">0</span>
+                    </h3>
+                    <div id="operationalImages" class="images-grid">
+                        <!-- Operational images will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <i class="bi bi-images"></i>
+                    <h4>Nenhuma imagem processada encontrada</h4>
+                    <p>Faça upload e processamento de imagens na página principal para visualizá-las aqui.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel">
+                        <i class="bi bi-zoom-in me-2"></i>Visualização da Imagem
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body text-center p-0">
+                    <img id="modalImage" src="" alt="Imagem ampliada" class="img-fluid" loading="lazy">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-primary" id="downloadModalBtn">
+                        <i class="bi bi-download me-2"></i>Baixar
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/colagem.js" defer></script>
+</body>
+</html>

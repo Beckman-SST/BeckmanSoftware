@@ -90,8 +90,6 @@ class RePostureApp {
                 const title = e.currentTarget.getAttribute('title');
                 if (title === 'Configurações') {
                     window.location.href = 'configuracoes.html';
-                } else if (title === 'Colagem') {
-                    this.toggleSection('collage-section');
                 }
             });
         });
@@ -443,13 +441,17 @@ class RePostureApp {
 
         files.forEach(file => {
             const isVideo = /\.(mp4|avi|mov|wmv)$/i.test(file.name);
-            const isOperational = /operacional|operational/i.test(file.name);
+            const isOperational = file.name.startsWith('op_');
+            const isExecutive = file.name.startsWith('ex_');
 
             if (isVideo) {
                 categories.videos.push(file);
             } else if (isOperational) {
                 categories.operational.push(file);
+            } else if (isExecutive) {
+                categories.executive.push(file);
             } else {
+                // Fallback: se não tem prefixo, considera como executivo
                 categories.executive.push(file);
             }
         });

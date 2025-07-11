@@ -71,7 +71,9 @@ class ImageProcessor:
                 return True, "Imagem salva como arquivo de erro devido à falha na detecção de landmarks"
             
             # Salva a imagem processada apenas se o processamento foi bem-sucedido
-            output_filename = os.path.basename(image_path)
+            original_filename = os.path.basename(image_path)
+            name, ext = os.path.splitext(original_filename)
+            output_filename = f"ex_{name}{ext}"
             output_path = os.path.join(output_folder, output_filename)
             cv2.imwrite(output_path, processed_frame)
             

@@ -28,7 +28,9 @@ class OperacionalTarjaProcessor:
         height, width, _ = frame.shape
         face_landmarks = self.pose_detector.get_face_landmarks(results, width, height)
         processed_frame = self.visualizer.apply_face_blur(frame, face_landmarks)
-        output_filename = os.path.basename(image_path)
+        original_filename = os.path.basename(image_path)
+        name, ext = os.path.splitext(original_filename)
+        output_filename = f"op_{name}{ext}"
         output_path = os.path.join(output_folder, output_filename)
         cv2.imwrite(output_path, processed_frame)
         return True, output_path

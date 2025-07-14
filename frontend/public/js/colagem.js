@@ -4,9 +4,16 @@
  */
 class ColagemManager {
     constructor() {
-        this.executiveImages = [];
-        this.operationalImages = [];
+        this.executiveImagesList = [];
+        this.operationalImagesList = [];
         this.isLoading = false;
+        
+        // Selection and collage properties
+        this.selectedImages = [];
+        this.collageGroups = [];
+        this.currentGroupNumber = 1;
+        this.maxSelectionPerGroup = 3;
+        this.usedInCollages = new Set(); // Track images used in collages
         
         this.initializeElements();
         this.loadImages();
@@ -21,14 +28,25 @@ class ColagemManager {
         this.emptyState = document.getElementById('emptyState');
         this.executiveSection = document.getElementById('executiveSection');
         this.operationalSection = document.getElementById('operationalSection');
-        this.executiveImages = document.getElementById('executiveImages');
-        this.operationalImages = document.getElementById('operationalImages');
+        this.executiveImagesContainer = document.getElementById('executiveImages');
+        this.operationalImagesContainer = document.getElementById('operationalImages');
         this.executiveCount = document.getElementById('executiveCount');
         this.operationalCount = document.getElementById('operationalCount');
         this.imageModal = document.getElementById('imageModal');
         this.modalImage = document.getElementById('modalImage');
         this.modalTitle = document.getElementById('imageModalLabel');
         this.downloadModalBtn = document.getElementById('downloadModalBtn');
+        
+        // Selection panel elements
+        this.selectionPanel = document.getElementById('selectionPanel');
+        this.selectionCounter = document.getElementById('selectionCounter');
+        this.currentGroupNumberEl = document.getElementById('currentGroupNumber');
+        this.selectedImagesPreview = document.getElementById('selectedImagesPreview');
+        this.finishGroupBtn = document.getElementById('finishGroupBtn');
+        this.createCollageBtn = document.getElementById('createCollageBtn');
+        this.clearSelectionBtn = document.getElementById('clearSelectionBtn');
+        this.collageQueue = document.getElementById('collageQueue');
+        this.queueItems = document.getElementById('queueItems');
     }
 
     /**
@@ -42,11 +60,33 @@ class ColagemManager {
             });
         }
 
+        // Selection panel buttons
+        if (this.finishGroupBtn) {
+            this.finishGroupBtn.addEventListener('click', () => {
+                this.finishCurrentGroup();
+            });
+        }
+        
+        if (this.createCollageBtn) {
+            this.createCollageBtn.addEventListener('click', () => {
+                this.createAllCollages();
+            });
+        }
+        
+        if (this.clearSelectionBtn) {
+            this.clearSelectionBtn.addEventListener('click', () => {
+                this.clearAllSelections();
+            });
+        }
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
                 e.preventDefault();
                 this.refreshImages();
+            }
+            if (e.key === 'Escape') {
+                this.clearCurrentSelection();
             }
         });
     }
@@ -85,20 +125,20 @@ class ColagemManager {
      * Categorize images based on filename prefixes
      */
     categorizeImages(images) {
-        this.executiveImages = [];
-        this.operationalImages = [];
+        this.executiveImagesList = [];
+        this.operationalImagesList = [];
         
         images.forEach(image => {
             if (this.isExecutiveImage(image)) {
-                this.executiveImages.push(image);
+                this.executiveImagesList.push(image);
             } else if (this.isOperationalImage(image)) {
-                this.operationalImages.push(image);
+                this.operationalImagesList.push(image);
             }
         });
         
         // Sort images by date (newest first)
-        this.executiveImages.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-        this.operationalImages.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        this.executiveImagesList.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        this.operationalImagesList.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     }
 
     /**
@@ -149,8 +189,8 @@ class ColagemManager {
      * Render images in their respective sections
      */
     renderImages() {
-        const hasExecutive = this.executiveImages.length > 0;
-        const hasOperational = this.operationalImages.length > 0;
+        const hasExecutive = this.executiveImagesList.length > 0;
+        const hasOperational = this.operationalImagesList.length > 0;
         
         if (!hasExecutive && !hasOperational) {
             this.showEmptyState();
@@ -164,14 +204,14 @@ class ColagemManager {
         
         // Render executive images
         if (hasExecutive) {
-            this.renderImageSection(this.executiveImages, this.executiveImages, this.executiveSection, this.executiveCount);
+            this.renderImageSection(this.executiveImagesList, this.executiveImagesContainer, this.executiveSection, this.executiveCount);
         } else {
             if (this.executiveSection) this.executiveSection.style.display = 'none';
         }
         
         // Render operational images
         if (hasOperational) {
-            this.renderImageSection(this.operationalImages, this.operationalImages, this.operationalSection, this.operationalCount);
+            this.renderImageSection(this.operationalImagesList, this.operationalImagesContainer, this.operationalSection, this.operationalCount);
         } else {
             if (this.operationalSection) this.operationalSection.style.display = 'none';
         }
@@ -210,19 +250,34 @@ class ColagemManager {
      */
     createImageCard(image) {
         const card = document.createElement('div');
+        const imageId = image.name || image.filename;
         card.className = 'image-card';
+        card.dataset.imageId = imageId;
         
-        const imageUrl = this.getImageUrl(image.name || image.filename);
+        // Check if image was used in collages
+        if (this.usedInCollages.has(imageId)) {
+            card.classList.add('used-in-collage');
+        }
+        
+        const imageUrl = this.getImageUrl(imageId);
         const displayName = image.original_name || image.name || image.filename;
         
+        const checkMarkHtml = this.usedInCollages.has(imageId) ? 
+            '<div class="collage-check-mark"><i class="bi bi-check"></i></div>' : '';
+        
         card.innerHTML = `
-            <img src="${imageUrl}" alt="${this.escapeHtml(displayName)}" loading="lazy" 
-                 onclick="colagemManager.openImageModal('${imageUrl}', '${this.escapeHtml(displayName)}', '${image.filename}')">
+            ${checkMarkHtml}
+            <img src="${imageUrl}" alt="${this.escapeHtml(displayName)}" loading="lazy">
             <div class="image-info">
                 <div class="image-name" title="${this.escapeHtml(displayName)}">
                     ${this.escapeHtml(this.truncateText(displayName, 30))}
                 </div>
                 <div class="image-actions">
+                    <button class="btn btn-outline-info btn-action" 
+                            onclick="colagemManager.toggleImageSelection('${imageId}')" 
+                            title="Selecionar para Colagem">
+                        <i class="bi bi-check-square"></i>
+                    </button>
                     <button class="btn btn-outline-primary btn-action" 
                             onclick="colagemManager.viewImage('${imageUrl}')" 
                             title="Visualizar">
@@ -237,6 +292,14 @@ class ColagemManager {
             </div>
         `;
         
+        // Add click event for image selection
+        card.addEventListener('click', (e) => {
+            // Don't trigger selection if clicking on action buttons
+            if (!e.target.closest('.image-actions')) {
+                this.toggleImageSelection(imageId);
+            }
+        });
+        
         return card;
     }
 
@@ -244,7 +307,7 @@ class ColagemManager {
      * Get image URL for display
      */
     getImageUrl(filename) {
-        return `/api/output_file/${encodeURIComponent(filename)}`;
+        return `/output/${encodeURIComponent(filename)}`;
     }
 
     /**
@@ -297,6 +360,344 @@ class ColagemManager {
     async refreshImages() {
         await this.loadImages();
         this.showMessage('Imagens atualizadas com sucesso!', 'success');
+    }
+
+    /**
+     * Toggle image selection for collage
+     */
+    toggleImageSelection(imageId) {
+        const imageIndex = this.selectedImages.findIndex(img => img.id === imageId);
+        
+        if (imageIndex > -1) {
+            // Remove from selection
+            this.selectedImages.splice(imageIndex, 1);
+            this.updateImageCardSelection(imageId, false);
+        } else {
+            // Add to selection if not at max
+            if (this.selectedImages.length < this.maxSelectionPerGroup) {
+                const imageData = this.findImageById(imageId);
+                if (imageData) {
+                    this.selectedImages.push({
+                        id: imageId,
+                        data: imageData,
+                        url: this.getImageUrl(imageId)
+                    });
+                    this.updateImageCardSelection(imageId, true);
+                }
+            } else {
+                this.showMessage(`Máximo de ${this.maxSelectionPerGroup} imagens por grupo!`, 'warning');
+                return;
+            }
+        }
+        
+        this.updateSelectionPanel();
+        
+        // Auto-finish group when reaching max selection
+        if (this.selectedImages.length === this.maxSelectionPerGroup) {
+            setTimeout(() => {
+                this.finishCurrentGroup();
+            }, 500);
+        }
+    }
+
+    /**
+     * Find image data by ID
+     */
+    findImageById(imageId) {
+        const allImages = [...this.executiveImagesList, ...this.operationalImagesList];
+        return allImages.find(img => (img.name || img.filename) === imageId);
+    }
+
+    /**
+     * Update image card visual selection state
+     */
+    updateImageCardSelection(imageId, isSelected) {
+        const card = document.querySelector(`[data-image-id="${imageId}"]`);
+        if (card) {
+            // Remove existing selection indicators
+            card.classList.remove('selected');
+            const existingNumber = card.querySelector('.selection-group-number');
+            if (existingNumber) {
+                existingNumber.remove();
+            }
+            
+            if (isSelected) {
+                card.classList.add('selected');
+                
+                // Add group number indicator with color class
+                const groupNumber = document.createElement('div');
+                groupNumber.className = `selection-group-number group-${this.currentGroupNumber}`;
+                groupNumber.textContent = this.currentGroupNumber;
+                card.insertBefore(groupNumber, card.firstChild);
+            }
+        }
+    }
+
+    /**
+     * Update selection panel display
+     */
+    updateSelectionPanel() {
+        if (this.selectedImages.length > 0 || this.collageGroups.length > 0) {
+            this.selectionPanel.classList.add('show');
+        } else {
+            this.selectionPanel.classList.remove('show');
+        }
+        
+        // Update counter
+        this.selectionCounter.textContent = `${this.selectedImages.length}/${this.maxSelectionPerGroup}`;
+        
+        // Update group number
+        this.currentGroupNumberEl.textContent = this.currentGroupNumber;
+        
+        // Update preview thumbnails
+        this.updatePreviewThumbnails();
+        
+        // Update button states
+        this.finishGroupBtn.disabled = this.selectedImages.length === 0;
+        this.createCollageBtn.disabled = this.collageGroups.length === 0;
+        
+        // Update queue display
+        this.updateQueueDisplay();
+    }
+
+    /**
+     * Update preview thumbnails
+     */
+    updatePreviewThumbnails() {
+        this.selectedImagesPreview.innerHTML = '';
+        
+        this.selectedImages.forEach(img => {
+            const thumb = document.createElement('img');
+            thumb.src = img.url;
+            thumb.className = 'selected-image-thumb';
+            thumb.title = img.data.name || img.data.filename;
+            this.selectedImagesPreview.appendChild(thumb);
+        });
+    }
+
+    /**
+     * Finish current group and start new one
+     */
+    finishCurrentGroup() {
+        if (this.selectedImages.length === 0) return;
+        
+        // Add current selection to groups
+        this.collageGroups.push({
+            id: Date.now(),
+            groupNumber: this.currentGroupNumber,
+            images: [...this.selectedImages]
+        });
+        
+        // Clear current selection but keep visual indicators (numbers)
+        this.selectedImages.forEach(img => {
+            const card = document.querySelector(`[data-image-id="${img.id}"]`);
+            if (card) {
+                card.classList.remove('selected');
+            }
+        });
+        this.selectedImages = [];
+        
+        // Increment group number
+        this.currentGroupNumber++;
+        
+        this.updateSelectionPanel();
+        this.showMessage(`Grupo ${this.currentGroupNumber - 1} adicionado à fila!`, 'success');
+    }
+
+    /**
+     * Clear current selection only
+     */
+    clearCurrentSelection() {
+        // Remove visual indicators for each selected image
+        this.selectedImages.forEach(img => {
+            const card = document.querySelector(`[data-image-id="${img.id}"]`);
+            if (card) {
+                card.classList.remove('selected');
+                const groupNumber = card.querySelector('.selection-group-number');
+                if (groupNumber) {
+                    groupNumber.remove();
+                }
+            }
+        });
+        
+        this.selectedImages = [];
+        this.updateSelectionPanel();
+    }
+
+    /**
+     * Clear all selections and groups
+     */
+    clearAllSelections() {
+        this.selectedImages = [];
+        this.collageGroups = [];
+        this.currentGroupNumber = 1;
+        this.updateSelectionPanel();
+        this.updateQueueDisplay();
+        
+        // Remove selection visual indicators
+        document.querySelectorAll('.image-card.selected').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        // Remove all group number indicators
+        document.querySelectorAll('.selection-group-number').forEach(indicator => {
+            indicator.remove();
+        });
+        
+        this.showMessage('Todas as seleções foram limpas!', 'info');
+    }
+
+    /**
+     * Update visual indicators for images used in collages
+     */
+    updateUsedImagesVisuals() {
+        // Update existing image cards to show used status
+        document.querySelectorAll('.image-card').forEach(card => {
+            const imageId = card.dataset.imageId;
+            if (this.usedInCollages.has(imageId)) {
+                card.classList.add('used-in-collage');
+                
+                // Add check mark if not already present
+                if (!card.querySelector('.collage-check-mark')) {
+                    const checkMark = document.createElement('div');
+                    checkMark.className = 'collage-check-mark';
+                    checkMark.innerHTML = '<i class="bi bi-check"></i>';
+                    card.insertBefore(checkMark, card.firstChild);
+                }
+            }
+        });
+    }
+
+    /**
+     * Update queue display
+     */
+    updateQueueDisplay() {
+        if (this.collageGroups.length > 0) {
+            this.collageQueue.style.display = 'block';
+            this.queueItems.innerHTML = '';
+            
+            this.collageGroups.forEach((group, index) => {
+                const queueItem = document.createElement('div');
+                queueItem.className = 'queue-item';
+                
+                const imagesDiv = document.createElement('div');
+                imagesDiv.className = 'queue-images';
+                
+                group.images.forEach(img => {
+                    const thumb = document.createElement('img');
+                    thumb.src = img.url;
+                    thumb.className = 'queue-thumb';
+                    thumb.title = img.data.name || img.data.filename;
+                    imagesDiv.appendChild(thumb);
+                });
+                
+                const infoDiv = document.createElement('div');
+                infoDiv.innerHTML = `
+                    <small><strong>Grupo ${group.groupNumber}</strong> - ${group.images.length} imagens</small>
+                `;
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'btn btn-outline-danger btn-sm';
+                removeBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                removeBtn.onclick = () => this.removeGroup(index);
+                
+                queueItem.appendChild(imagesDiv);
+                queueItem.appendChild(infoDiv);
+                queueItem.appendChild(removeBtn);
+                
+                this.queueItems.appendChild(queueItem);
+            });
+        } else {
+            this.collageQueue.style.display = 'none';
+        }
+    }
+
+    /**
+     * Remove group from queue
+     */
+    removeGroup(index) {
+        const groupToRemove = this.collageGroups[index];
+        
+        // Remove visual indicators from images in this group
+        if (groupToRemove && groupToRemove.images) {
+            groupToRemove.images.forEach(img => {
+                const card = document.querySelector(`[data-image-id="${img.id}"]`);
+                if (card) {
+                    card.classList.remove('selected');
+                    const groupNumber = card.querySelector('.selection-group-number');
+                    if (groupNumber) {
+                        groupNumber.remove();
+                    }
+                }
+            });
+        }
+        
+        this.collageGroups.splice(index, 1);
+        this.updateSelectionPanel();
+        this.showMessage('Grupo removido da fila!', 'info');
+    }
+
+    /**
+     * Create all collages
+     */
+    async createAllCollages() {
+        if (this.collageGroups.length === 0) {
+            this.showMessage('Nenhum grupo na fila para criar colagens!', 'warning');
+            return;
+        }
+        
+        // Add current selection to groups if any
+        if (this.selectedImages.length > 0) {
+            this.finishCurrentGroup();
+        }
+        
+        this.showMessage('Criando colagens...', 'info');
+        
+        try {
+            const response = await fetch('/api/create-collages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    groups: this.collageGroups.map(group => ({
+                        images: group.images.map(img => img.id)
+                    }))
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Mark all images from completed groups as used
+                this.collageGroups.forEach(group => {
+                    group.images.forEach(img => {
+                        this.usedInCollages.add(img.id);
+                    });
+                });
+                
+                // Remove all group number indicators before updating used images visuals
+                document.querySelectorAll('.selection-group-number').forEach(indicator => {
+                    indicator.remove();
+                });
+                
+                // Update visual indicators for used images
+                this.updateUsedImagesVisuals();
+                
+                this.showMessage(`${result.collages.length} colagens criadas com sucesso!`, 'success');
+                this.clearAllSelections();
+                
+                // Refresh images to show new collages
+                setTimeout(() => {
+                    this.refreshImages();
+                }, 1000);
+            } else {
+                this.showMessage('Erro ao criar colagens: ' + (result.error || 'Erro desconhecido'), 'error');
+            }
+        } catch (error) {
+            console.error('Erro ao criar colagens:', error);
+            this.showMessage('Erro ao criar colagens', 'error');
+        }
     }
 
     /**

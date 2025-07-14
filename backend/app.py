@@ -669,6 +669,90 @@ def unir_imagens():
 def merge_file(filename):
     return send_from_directory(app.config['MERGE_FOLDER'], filename)
 
+# API para criar múltiplas colagens
+@app.route('/api/create-collages', methods=['POST'])
+def create_collages():
+    try:
+        # Recebe os grupos de imagens
+        data = request.get_json()
+        if not data or 'groups' not in data:
+            return jsonify({'success': False, 'error': 'Grupos de imagens não fornecidos'}), 400
+            
+        groups = data.get('groups', [])
+        if not groups:
+            return jsonify({'success': False, 'error': 'Nenhum grupo de imagens fornecido'}), 400
+
+        created_collages = []
+        
+        # Processa cada grupo
+        for group_index, group in enumerate(groups):
+            if 'images' not in group or not group['images']:
+                continue
+                
+            imagens = group['images']
+            if len(imagens) < 1:
+                continue
+
+            # Lista para armazenar as imagens carregadas
+            images = []
+            max_height = 0
+            total_width = 0
+
+            # Carrega todas as imagens e calcula dimensões
+            for img_name in imagens:
+                img_path = os.path.join(app.config['OUTPUT_FOLDER'], img_name)
+                if not os.path.exists(img_path):
+                    continue
+                
+                img = Image.open(img_path)
+                images.append(img)
+                max_height = max(max_height, img.size[1])
+                total_width += img.size[0]
+
+            if not images:
+                continue
+
+            # Cria uma nova imagem com as dimensões calculadas
+            result = Image.new('RGB', (total_width, max_height))
+            current_width = 0
+
+            # Cola cada imagem na posição correta
+            for img in images:
+                # Redimensiona a altura mantendo a proporção
+                if img.size[1] != max_height:
+                    ratio = max_height / img.size[1]
+                    new_width = int(img.size[0] * ratio)
+                    img = img.resize((new_width, max_height), Image.Resampling.LANCZOS)
+
+                result.paste(img, (current_width, 0))
+                current_width += img.size[0]
+
+            # Gera um nome único para a colagem
+            timestamp = int(time.time())
+            output_filename = f'collage_{timestamp}_{group_index + 1}_{uuid.uuid4().hex[:6]}.jpg'
+            output_path = os.path.join(app.config['MERGE_FOLDER'], output_filename)
+
+            # Salva a colagem
+            result.save(output_path, 'JPEG', quality=95)
+            
+            created_collages.append({
+                'filename': output_filename,
+                'url': url_for('merge_file', filename=output_filename),
+                'images_count': len(images)
+            })
+
+        if not created_collages:
+            return jsonify({'success': False, 'error': 'Nenhuma colagem pôde ser criada'}), 400
+
+        return jsonify({
+            'success': True,
+            'message': f'{len(created_collages)} colagens criadas com sucesso',
+            'collages': created_collages
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 

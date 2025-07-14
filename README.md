@@ -63,10 +63,11 @@ A documentação completa do sistema está disponível no diretório `docs/`. Co
 ### Estrutura da Documentação
 
 - [Arquitetura](./docs/arquitetura/README.md): Documentação de arquitetura do sistema
-- [Técnico](./docs/tecnico/README.md): Documentação técnica da implementação
+- [Técnico](./docs/technical/README.md): Documentação técnica da implementação
 - [Critérios](./docs/criterios/README.md): Documentação dos critérios de avaliação
 - [Guias](./docs/guias/README.md): Guias de uso e manutenção
 - [API](./docs/api/README.md): Documentação da API do sistema
+- [Colagem](./docs/colagem/README.md): Documentação do sistema de colagem
 
 ## Contribuição
 

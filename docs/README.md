@@ -1,8 +1,8 @@
-# Documentação do Sistema de Processamento de Vídeos
+# Documentação do Sistema BeckmanSoftware
 
 ## Visão Geral
 
-Bem-vindo à documentação do Sistema de Processamento de Vídeos. Este sistema foi desenvolvido para analisar a postura de pessoas em vídeos, detectando landmarks do corpo usando MediaPipe, calculando ângulos entre articulações e avaliando a ergonomia da postura com base em critérios estabelecidos.
+Bem-vindo à documentação completa do Sistema BeckmanSoftware. Este sistema integra múltiplas funcionalidades para processamento de imagens e vídeos, incluindo análise de postura, detecção de landmarks do corpo usando MediaPipe, cálculo de ângulos entre articulações, avaliação ergonômica e criação de colagens personalizadas.
 
 ## Estrutura da Documentação
 
@@ -12,10 +12,10 @@ A documentação está organizada nas seguintes seções:
 
 Descrição da arquitetura do sistema, incluindo componentes, fluxo de dados e interações entre módulos.
 
-### [Técnico](./tecnico/)
+### [Técnico](./technical/)
 
-- [Processamento de Vídeos](./tecnico/processamento_videos.md) - Documentação detalhada sobre o sistema de processamento de vídeos, incluindo fluxo de processamento, detecção de pose, análise de ângulos e visualização.
-- [Implementação](./tecnico/implementacao.md) - Detalhes técnicos da implementação, incluindo estrutura de código, algoritmos e otimizações.
+- [Processamento de Vídeos](./technical/processamento_videos.md) - Documentação detalhada sobre o sistema de processamento de vídeos, incluindo fluxo de processamento, detecção de pose, análise de ângulos e visualização.
+- [Implementação](./technical/implementacao.md) - Detalhes técnicos da implementação, incluindo estrutura de código, algoritmos e otimizações.
 
 ### [Critérios](./criterios/)
 
@@ -25,6 +25,12 @@ Descrição da arquitetura do sistema, incluindo componentes, fluxo de dados e i
 
 - [Manutenção](./guias/manutencao.md) - Guia de manutenção do sistema, incluindo modificação de componentes existentes, adição de novos recursos e resolução de problemas comuns.
 
+### [Colagem](./colagem/)
+
+- [Visão Geral](./colagem/README.md) - Documentação completa do sistema de colagem, incluindo funcionalidades e arquitetura.
+- [Template Frontend](./colagem/template.md) - Documentação detalhada do frontend do sistema de colagem.
+- [Backend APIs](./colagem/backend.md) - Documentação das APIs e processamento backend do sistema de colagem.
+
 ### [API](./api/)
 
 Documentação da API do sistema, incluindo classes, métodos e parâmetros.
@@ -33,10 +39,11 @@ Documentação da API do sistema, incluindo classes, métodos e parâmetros.
 
 Para começar a usar o sistema, recomendamos seguir estes passos:
 
-1. Leia a [documentação de processamento de vídeos](./tecnico/processamento_videos.md) para entender o funcionamento geral do sistema.
-2. Consulte a [documentação de implementação](./tecnico/implementacao.md) para detalhes técnicos sobre a implementação.
-3. Verifique os [critérios de angulação](./criterios/angulacao.md) para entender como os ângulos são avaliados.
-4. Siga o [guia de manutenção](./guias/manutencao.md) para modificar ou estender o sistema.
+1. Leia a [documentação de processamento de vídeos](./technical/processamento_videos.md) para entender o funcionamento do sistema de análise de postura.
+2. Consulte a [documentação do sistema de colagem](./colagem/README.md) para entender as funcionalidades de criação de colagens.
+3. Verifique a [documentação de implementação](./technical/implementacao.md) para detalhes técnicos sobre a implementação.
+4. Consulte os [critérios de angulação](./criterios/angulacao.md) para entender como os ângulos são avaliados.
+5. Siga o [guia de manutenção](./guias/manutencao.md) para modificar ou estender o sistema.
 
 ## Requisitos do Sistema
 

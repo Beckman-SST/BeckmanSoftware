@@ -273,11 +273,26 @@
             margin-bottom: 1rem;
         }
         
-        .group-title {
+        .group-name-input {
+            margin-bottom: 0.75rem;
+        }
+        
+        .group-name-input .form-label {
             font-weight: 600;
             color: #495057;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+            font-size: 0.85rem;
+        }
+        
+        .group-name-input .form-control {
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+            font-size: 0.85rem;
+        }
+        
+        .group-name-input .form-control:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
         }
         
         .collage-queue {
@@ -416,7 +431,10 @@
         </div>
         
         <div class="group-indicator">
-            <div class="group-title">Grupo <span id="currentGroupNumber">1</span></div>
+            <div class="group-name-input">
+                <label for="groupNameInput" class="form-label">Nome do Grupo:</label>
+                <input type="text" id="groupNameInput" class="form-control form-control-sm" placeholder="Digite o nome do grupo..." maxlength="50">
+            </div>
             <div id="selectedImagesPreview" class="selected-images-preview">
                 <!-- Selected image thumbnails will appear here -->
             </div>

@@ -7,7 +7,7 @@ import json
 import tempfile
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify, send_file
 from werkzeug.utils import secure_filename
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import uuid
 from modules.processors.video_processor import VideoProcessor
 
@@ -690,15 +690,15 @@ def create_collages():
                 continue
                 
             imagens = group['images']
+            group_name = group.get('groupName', f'Grupo {group_index + 1}')
             if len(imagens) < 1:
                 continue
 
             # Lista para armazenar as imagens carregadas
             images = []
             max_height = 0
-            total_width = 0
 
-            # Carrega todas as imagens e calcula dimensões
+            # Carrega todas as imagens e encontra a altura máxima
             for img_name in imagens:
                 img_path = os.path.join(app.config['OUTPUT_FOLDER'], img_name)
                 if not os.path.exists(img_path):
@@ -707,33 +707,71 @@ def create_collages():
                 img = Image.open(img_path)
                 images.append(img)
                 max_height = max(max_height, img.size[1])
-                total_width += img.size[0]
 
             if not images:
                 continue
 
-            # Cria uma nova imagem com as dimensões calculadas
-            result = Image.new('RGB', (total_width, max_height))
-            current_width = 0
-
-            # Cola cada imagem na posição correta
+            # Redimensiona todas as imagens para a mesma altura e calcula largura total
+            resized_images = []
+            total_width = 0
+            
             for img in images:
                 # Redimensiona a altura mantendo a proporção
                 if img.size[1] != max_height:
                     ratio = max_height / img.size[1]
                     new_width = int(img.size[0] * ratio)
                     img = img.resize((new_width, max_height), Image.Resampling.LANCZOS)
+                
+                resized_images.append(img)
+                total_width += img.size[0]
 
-                result.paste(img, (current_width, 0))
+            # Calcula dimensões para o texto
+            text_height = 60  # Altura reservada para o texto
+            final_height = max_height + text_height
+
+            # Cria uma nova imagem com as dimensões corretas incluindo espaço para texto
+            result = Image.new('RGB', (total_width, final_height), color='white')
+            
+            # Cola cada imagem redimensionada na posição correta (abaixo do texto)
+            current_width = 0
+            for img in resized_images:
+                result.paste(img, (current_width, text_height))
                 current_width += img.size[0]
+
+            # Adiciona o texto do nome do grupo
+            draw = ImageDraw.Draw(result)
+            
+            # Tenta usar uma fonte do sistema, senão usa a fonte padrão
+            try:
+                # Tenta carregar uma fonte TrueType do sistema
+                font = ImageFont.truetype("arial.ttf", 36)
+            except:
+                try:
+                    # Fallback para fonte padrão do PIL
+                    font = ImageFont.load_default()
+                except:
+                    font = None
+            
+            # Calcula posição centralizada do texto
+            if font:
+                bbox = draw.textbbox((0, 0), group_name, font=font)
+                text_width = bbox[2] - bbox[0]
+            else:
+                text_width = len(group_name) * 10  # Estimativa aproximada
+            
+            text_x = (total_width - text_width) // 2
+            text_y = (text_height - 36) // 2  # Centraliza verticalmente no espaço reservado
+            
+            # Desenha o texto
+            draw.text((text_x, text_y), group_name, fill='black', font=font)
 
             # Gera um nome único para a colagem
             timestamp = int(time.time())
-            output_filename = f'collage_{timestamp}_{group_index + 1}_{uuid.uuid4().hex[:6]}.jpg'
+            output_filename = f'collage_{timestamp}_{group_index + 1}_{uuid.uuid4().hex[:6]}.png'
             output_path = os.path.join(app.config['MERGE_FOLDER'], output_filename)
 
-            # Salva a colagem
-            result.save(output_path, 'JPEG', quality=95)
+            # Salva a colagem como PNG para preservar a qualidade do texto
+            result.save(output_path, 'PNG', optimize=True)
             
             created_collages.append({
                 'filename': output_filename,

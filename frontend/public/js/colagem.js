@@ -40,7 +40,7 @@ class ColagemManager {
         // Selection panel elements
         this.selectionPanel = document.getElementById('selectionPanel');
         this.selectionCounter = document.getElementById('selectionCounter');
-        this.currentGroupNumberEl = document.getElementById('currentGroupNumber');
+        this.groupNameInput = document.getElementById('groupNameInput');
         this.selectedImagesPreview = document.getElementById('selectedImagesPreview');
         this.finishGroupBtn = document.getElementById('finishGroupBtn');
         this.createCollageBtn = document.getElementById('createCollageBtn');
@@ -391,13 +391,6 @@ class ColagemManager {
         }
         
         this.updateSelectionPanel();
-        
-        // Auto-finish group when reaching max selection
-        if (this.selectedImages.length === this.maxSelectionPerGroup) {
-            setTimeout(() => {
-                this.finishCurrentGroup();
-            }, 500);
-        }
     }
 
     /**
@@ -446,8 +439,10 @@ class ColagemManager {
         // Update counter
         this.selectionCounter.textContent = `${this.selectedImages.length}/${this.maxSelectionPerGroup}`;
         
-        // Update group number
-        this.currentGroupNumberEl.textContent = this.currentGroupNumber;
+        // Update group name input with default value if empty
+        if (this.groupNameInput && !this.groupNameInput.value.trim()) {
+            this.groupNameInput.value = `Grupo ${this.currentGroupNumber}`;
+        }
         
         // Update preview thumbnails
         this.updatePreviewThumbnails();
@@ -481,10 +476,18 @@ class ColagemManager {
     finishCurrentGroup() {
         if (this.selectedImages.length === 0) return;
         
+        // Get group name from input
+        const groupName = this.groupNameInput ? this.groupNameInput.value.trim() : `Grupo ${this.currentGroupNumber}`;
+        if (!groupName) {
+            this.showMessage('Por favor, insira um nome para o grupo!', 'warning');
+            return;
+        }
+        
         // Add current selection to groups
         this.collageGroups.push({
             id: Date.now(),
             groupNumber: this.currentGroupNumber,
+            groupName: groupName,
             images: [...this.selectedImages]
         });
         
@@ -497,11 +500,14 @@ class ColagemManager {
         });
         this.selectedImages = [];
         
-        // Increment group number
+        // Increment group number and clear input for next group
         this.currentGroupNumber++;
+        if (this.groupNameInput) {
+            this.groupNameInput.value = '';
+        }
         
         this.updateSelectionPanel();
-        this.showMessage(`Grupo ${this.currentGroupNumber - 1} adicionado à fila!`, 'success');
+        this.showMessage(`${groupName} adicionado à fila!`, 'success');
     }
 
     /**
@@ -593,7 +599,7 @@ class ColagemManager {
                 
                 const infoDiv = document.createElement('div');
                 infoDiv.innerHTML = `
-                    <small><strong>Grupo ${group.groupNumber}</strong> - ${group.images.length} imagens</small>
+                    <small><strong>${group.groupName || `Grupo ${group.groupNumber}`}</strong> - ${group.images.length} imagens</small>
                 `;
                 
                 const removeBtn = document.createElement('button');
@@ -661,7 +667,8 @@ class ColagemManager {
                 },
                 body: JSON.stringify({
                     groups: this.collageGroups.map(group => ({
-                        images: group.images.map(img => img.id)
+                        images: group.images.map(img => img.id),
+                        groupName: group.groupName || `Grupo ${group.groupNumber}`
                     }))
                 })
             });

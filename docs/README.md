@@ -14,6 +14,7 @@ Descrição da arquitetura do sistema, incluindo componentes, fluxo de dados e i
 
 ### [Técnico](./technical/)
 
+- [Processamento de Imagens](./technical/processamento_imagens.md) - Documentação completa sobre o sistema de processamento de imagens, incluindo detecção de pose, análise ergonômica, algoritmos de cálculo de ângulos e otimizações.
 - [Processamento de Vídeos](./technical/processamento_videos.md) - Documentação detalhada sobre o sistema de processamento de vídeos, incluindo fluxo de processamento, detecção de pose, análise de ângulos e visualização.
 - [Implementação](./technical/implementacao.md) - Detalhes técnicos da implementação, incluindo estrutura de código, algoritmos e otimizações.
 
@@ -39,11 +40,12 @@ Documentação da API do sistema, incluindo classes, métodos e parâmetros.
 
 Para começar a usar o sistema, recomendamos seguir estes passos:
 
-1. Leia a [documentação de processamento de vídeos](./technical/processamento_videos.md) para entender o funcionamento do sistema de análise de postura.
-2. Consulte a [documentação do sistema de colagem](./colagem/README.md) para entender as funcionalidades de criação de colagens.
-3. Verifique a [documentação de implementação](./technical/implementacao.md) para detalhes técnicos sobre a implementação.
-4. Consulte os [critérios de angulação](./criterios/angulacao.md) para entender como os ângulos são avaliados.
-5. Siga o [guia de manutenção](./guias/manutencao.md) para modificar ou estender o sistema.
+1. Leia a [documentação de processamento de imagens](./technical/processamento_imagens.md) para entender o funcionamento do sistema de análise de postura e ergonomia.
+2. Consulte a [documentação de processamento de vídeos](./technical/processamento_videos.md) para entender o processamento de sequências de vídeo.
+3. Verifique a [documentação do sistema de colagem](./colagem/README.md) para entender as funcionalidades de criação de colagens.
+4. Consulte a [documentação de implementação](./technical/implementacao.md) para detalhes técnicos sobre a implementação.
+5. Consulte os [critérios de angulação](./criterios/angulacao.md) para entender como os ângulos são avaliados.
+6. Siga o [guia de manutenção](./guias/manutencao.md) para modificar ou estender o sistema.
 
 ## Requisitos do Sistema
 

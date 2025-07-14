@@ -1,10 +1,25 @@
-# Documentação Técnica do Sistema de Processamento de Vídeos
+# Documentação Técnica do Sistema BeckmanSoftware
 
 ## Visão Geral
 
-Esta seção contém a documentação técnica detalhada do Sistema de Processamento de Vídeos, incluindo informações sobre a implementação, algoritmos, estrutura de código e otimizações.
+Esta seção contém a documentação técnica detalhada do Sistema BeckmanSoftware, incluindo informações sobre a implementação, algoritmos, estrutura de código e otimizações para os módulos de processamento de imagens e vídeos.
 
 ## Conteúdo
+
+### [Processamento de Imagens](./processamento_imagens.md)
+
+Documentação completa sobre o sistema de processamento de imagens, incluindo:
+
+- Arquitetura do sistema e componentes principais
+- Detecção de pose com MediaPipe (33 landmarks)
+- Detecção de dispositivos eletrônicos com YOLOv8
+- Análise de ângulos ergonômicos (cotovelo, antebraço, pulso, joelho, coluna)
+- Sistema de pontuação baseado em critérios de Suzanne Rodgers
+- Visualização de landmarks, conexões e ângulos
+- Processamento adaptativo (parte superior/inferior do corpo)
+- Algoritmos de suavização e otimizações
+- Configurações e personalização
+- Casos de uso e troubleshooting
 
 ### [Processamento de Vídeos](./processamento_videos.md)
 

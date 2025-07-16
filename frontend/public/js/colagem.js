@@ -15,9 +15,146 @@ class ColagemManager {
         this.maxSelectionPerGroup = 3;
         this.usedInCollages = new Set(); // Track images used in collages
         
+        // Load persisted used images from localStorage
+        this.loadPersistedUsedImages();
+        
         this.initializeElements();
         this.loadImages();
         this.attachEventListeners();
+    }
+
+    /**
+     * Load persisted used images from localStorage
+     */
+    loadPersistedUsedImages() {
+        try {
+            const savedUsedImages = localStorage.getItem('colagemUsedImages');
+            if (savedUsedImages) {
+                const usedImagesArray = JSON.parse(savedUsedImages);
+                this.usedInCollages = new Set(usedImagesArray);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar imagens marcadas do localStorage:', error);
+            this.usedInCollages = new Set();
+        }
+    }
+
+    /**
+     * Save used images to localStorage
+     */
+    savePersistedUsedImages() {
+        try {
+            const usedImagesArray = Array.from(this.usedInCollages);
+            localStorage.setItem('colagemUsedImages', JSON.stringify(usedImagesArray));
+        } catch (error) {
+            console.error('Erro ao salvar imagens marcadas no localStorage:', error);
+        }
+    }
+
+    /**
+     * Toggle used in collage status for an image
+     */
+    toggleUsedInCollage(imageId) {
+        if (this.usedInCollages.has(imageId)) {
+            this.usedInCollages.delete(imageId);
+            this.showMessage('Imagem desmarcada como colada!', 'info');
+        } else {
+            this.usedInCollages.add(imageId);
+            this.showMessage('Imagem marcada como colada!', 'success');
+        }
+        
+        // Save to localStorage
+        this.savePersistedUsedImages();
+        
+        // Update visual indicators
+        this.updateImageUsedStatus(imageId);
+    }
+
+    /**
+     * Update visual status of a specific image
+     */
+    updateImageUsedStatus(imageId) {
+        const card = document.querySelector(`[data-image-id="${imageId}"]`);
+        if (card) {
+            const isUsed = this.usedInCollages.has(imageId);
+            
+            if (isUsed) {
+                card.classList.add('used-in-collage');
+                
+                // Add check mark if not already present
+                if (!card.querySelector('.collage-check-mark')) {
+                    const checkMark = document.createElement('div');
+                    checkMark.className = 'collage-check-mark';
+                    checkMark.innerHTML = '<i class="bi bi-check"></i>';
+                    card.insertBefore(checkMark, card.firstChild);
+                }
+            } else {
+                card.classList.remove('used-in-collage');
+                
+                // Remove check mark if present
+                const checkMark = card.querySelector('.collage-check-mark');
+                if (checkMark) {
+                    checkMark.remove();
+                }
+            }
+            
+            // Update the toggle button
+            this.updateToggleButton(card, isUsed);
+        }
+    }
+
+    /**
+     * Clear all used in collage markings
+     */
+    clearAllUsedMarkings() {
+        if (this.usedInCollages.size === 0) {
+            this.showMessage('Não há imagens marcadas como coladas!', 'info');
+            return;
+        }
+        
+        if (confirm('Tem certeza que deseja desmarcar todas as imagens como coladas?')) {
+            // Clear the set
+            this.usedInCollages.clear();
+            
+            // Save to localStorage
+            this.savePersistedUsedImages();
+            
+            // Update all image cards
+            document.querySelectorAll('.image-card').forEach(card => {
+                const imageId = card.dataset.imageId;
+                if (imageId) {
+                    this.updateImageUsedStatus(imageId);
+                }
+            });
+            
+            this.showMessage('Todas as marcações foram removidas!', 'success');
+        }
+    }
+
+    /**
+     * Update the toggle button appearance based on used status
+     */
+    updateToggleButton(card, isUsed) {
+        const toggleButton = card.querySelector('.image-actions button:first-child');
+        if (toggleButton) {
+            const toggleButtonText = isUsed ? 'Desmarcar' : 'Marcar como Colada';
+            const toggleButtonIcon = isUsed ? 'bi-x-circle' : 'bi-check-circle';
+            const toggleButtonClass = isUsed ? 'btn-outline-warning' : 'btn-outline-success';
+            
+            // Remove old classes
+            toggleButton.classList.remove('btn-outline-warning', 'btn-outline-success');
+            // Add new class
+            toggleButton.classList.add(toggleButtonClass);
+            
+            // Update icon
+            const icon = toggleButton.querySelector('i');
+            if (icon) {
+                icon.className = `bi ${toggleButtonIcon}`;
+            }
+            
+            // Update title
+            toggleButton.title = toggleButtonText;
+        }
     }
 
     /**
@@ -265,6 +402,12 @@ class ColagemManager {
         const checkMarkHtml = this.usedInCollages.has(imageId) ? 
             '<div class="collage-check-mark"><i class="bi bi-check"></i></div>' : '';
         
+        // Determine button text and icon based on current status
+        const isUsed = this.usedInCollages.has(imageId);
+        const toggleButtonText = isUsed ? 'Desmarcar' : 'Marcar como Colada';
+        const toggleButtonIcon = isUsed ? 'bi-x-circle' : 'bi-check-circle';
+        const toggleButtonClass = isUsed ? 'btn-outline-warning' : 'btn-outline-success';
+        
         card.innerHTML = `
             ${checkMarkHtml}
             <img src="${imageUrl}" alt="${this.escapeHtml(displayName)}" loading="lazy">
@@ -273,18 +416,18 @@ class ColagemManager {
                     ${this.escapeHtml(this.truncateText(displayName, 30))}
                 </div>
                 <div class="image-actions">
-                    <button class="btn btn-outline-info btn-action" 
-                            onclick="colagemManager.toggleImageSelection('${imageId}')" 
-                            title="Selecionar para Colagem">
-                        <i class="bi bi-check-square"></i>
+                    <button class="btn ${toggleButtonClass} btn-action" 
+                            onclick="colagemManager.toggleUsedInCollage('${imageId}')" 
+                            title="${toggleButtonText}">
+                        <i class="bi ${toggleButtonIcon}"></i>
                     </button>
                     <button class="btn btn-outline-primary btn-action" 
                             onclick="colagemManager.viewImage('${imageUrl}')" 
                             title="Visualizar">
                         <i class="bi bi-eye"></i>
                     </button>
-                    <button class="btn btn-outline-success btn-action" 
-                            onclick="colagemManager.downloadImage('${imageUrl}', '${this.escapeHtml(displayName)}')" 
+                    <button class="btn btn-outline-info btn-action" 
+                            onclick="colagemManager.downloadImageFromCard('${imageId}')" 
                             title="Baixar">
                         <i class="bi bi-download"></i>
                     </button>
@@ -292,7 +435,7 @@ class ColagemManager {
             </div>
         `;
         
-        // Add click event for image selection
+        // Add click event for image selection for collage
         card.addEventListener('click', (e) => {
             // Don't trigger selection if clicking on action buttons
             if (!e.target.closest('.image-actions')) {
@@ -331,6 +474,16 @@ class ColagemManager {
      */
     viewImage(imageUrl) {
         window.open(imageUrl, '_blank');
+    }
+
+    /**
+     * Download image from card
+     */
+    downloadImageFromCard(imageId) {
+        const imageData = this.findImageById(imageId);
+        if (imageData) {
+            this.downloadImage(imageData);
+        }
     }
 
     /**
@@ -683,6 +836,9 @@ class ColagemManager {
                     });
                 });
                 
+                // Save to localStorage
+                this.savePersistedUsedImages();
+                
                 // Remove all group number indicators before updating used images visuals
                 document.querySelectorAll('.selection-group-number').forEach(indicator => {
                     indicator.remove();
@@ -740,29 +896,128 @@ class ColagemManager {
     }
 
     /**
-     * Show message to user
+     * Show message to user with improved toast system
      */
     showMessage(message, type = 'info') {
+        // Create toast container if it doesn't exist
+        let toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toast-container';
+            toastContainer.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                max-width: 400px;
+                pointer-events: none;
+            `;
+            document.body.appendChild(toastContainer);
+        }
+
         const toast = document.createElement('div');
         const alertClass = type === 'success' ? 'alert-success' : 
                           type === 'warning' ? 'alert-warning' : 
                           type === 'error' ? 'alert-danger' : 'alert-info';
         
-        toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-        toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px;';
+        const toastId = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        toast.id = toastId;
+        toast.className = `alert ${alertClass} alert-dismissible fade show mb-2`;
+        toast.style.cssText = `
+            min-width: 300px;
+            max-width: 400px;
+            pointer-events: auto;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: none;
+            border-radius: 8px;
+        `;
+        
         toast.innerHTML = `
-            ${this.escapeHtml(message)}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="bi ${this.getToastIcon(type)}" style="font-size: 1.1em;"></i>
+                <span style="flex: 1;">${this.escapeHtml(message)}</span>
+                <button type="button" class="btn-close" onclick="dismissToast('${toastId}')" aria-label="Fechar" style="font-size: 0.8em;"></button>
+            </div>
         `;
 
-        document.body.appendChild(toast);
+        // Add to container
+        toastContainer.appendChild(toast);
 
-        // Auto remove after 5 seconds
+        // Animate in
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateX(0)';
+        });
+
+        // Auto dismiss after 4 seconds with fade out
         setTimeout(() => {
-            if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
-        }, 5000);
+            this.dismissToast(toastId);
+        }, 4000);
+    }
+
+    /**
+     * Get appropriate icon for toast type
+     */
+    getToastIcon(type) {
+        switch(type) {
+            case 'success': return 'bi-check-circle-fill';
+            case 'warning': return 'bi-exclamation-triangle-fill';
+            case 'error': return 'bi-x-circle-fill';
+            default: return 'bi-info-circle-fill';
+        }
+    }
+
+    /**
+     * Dismiss a specific toast with fade out animation
+     */
+    dismissToast(toastId) {
+        const toast = document.getElementById(toastId);
+        if (toast) {
+            // Fade out animation
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            
+            // Remove from DOM after animation
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                    
+                    // Clean up container if empty
+                    const container = document.getElementById('toast-container');
+                    if (container && container.children.length === 0) {
+                        container.remove();
+                    }
+                }
+            }, 300);
+        }
+    }
+
+    /**
+     * Clear all toasts
+     */
+    clearAllToasts() {
+        const container = document.getElementById('toast-container');
+        if (container) {
+            // Fade out all toasts
+            Array.from(container.children).forEach((toast, index) => {
+                setTimeout(() => {
+                    if (toast) {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateX(100%)';
+                    }
+                }, index * 100); // Stagger the animations
+            });
+            
+            // Remove container after all animations
+            setTimeout(() => {
+                if (container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+            }, 500);
+        }
     }
 
     /**
@@ -794,6 +1049,24 @@ function toggleSidebar() {
 function refreshImages() {
     if (window.colagemManager) {
         window.colagemManager.refreshImages();
+    }
+}
+
+function dismissToast(toastId) {
+    if (window.colagemManager) {
+        window.colagemManager.dismissToast(toastId);
+    }
+}
+
+function clearAllToasts() {
+    if (window.colagemManager) {
+        window.colagemManager.clearAllToasts();
+    }
+}
+
+function clearAllUsedMarkings() {
+    if (window.colagemManager) {
+        window.colagemManager.clearAllUsedMarkings();
     }
 }
 

@@ -107,27 +107,27 @@ class ColagemManager {
      * Clear all used in collage markings
      */
     clearAllUsedMarkings() {
-        if (this.usedInCollages.size === 0) {
-            this.showMessage('Não há imagens marcadas como coladas!', 'info');
-            return;
-        }
+        const previousCount = this.usedInCollages.size;
         
-        if (confirm('Tem certeza que deseja desmarcar todas as imagens como coladas?')) {
-            // Clear the set
-            this.usedInCollages.clear();
-            
-            // Save to localStorage
-            this.savePersistedUsedImages();
-            
-            // Update all image cards
-            document.querySelectorAll('.image-card').forEach(card => {
-                const imageId = card.dataset.imageId;
-                if (imageId) {
-                    this.updateImageUsedStatus(imageId);
-                }
-            });
-            
-            this.showMessage('Todas as marcações foram removidas!', 'success');
+        // Clear the set
+        this.usedInCollages.clear();
+        
+        // Save to localStorage
+        this.savePersistedUsedImages();
+        
+        // Update all image cards visually
+        document.querySelectorAll('.image-card').forEach(card => {
+            const imageId = card.dataset.imageId;
+            if (imageId) {
+                this.updateImageUsedStatus(imageId, false);
+            }
+        });
+        
+        // Show success message
+        if (previousCount > 0) {
+            this.showMessage(`${previousCount} marcação(ões) removida(s) com sucesso!`, 'success');
+        } else {
+            this.showMessage('Nenhuma marcação encontrada para remover.', 'info');
         }
     }
 
@@ -213,6 +213,19 @@ class ColagemManager {
         if (this.clearSelectionBtn) {
             this.clearSelectionBtn.addEventListener('click', () => {
                 this.clearAllSelections();
+            });
+        }
+
+        // Clear markings confirmation modal
+        const confirmClearMarkingsBtn = document.getElementById('confirmClearMarkings');
+        if (confirmClearMarkingsBtn) {
+            confirmClearMarkingsBtn.addEventListener('click', () => {
+                this.clearAllUsedMarkings();
+                // Close the modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('clearMarkingsModal'));
+                if (modal) {
+                    modal.hide();
+                }
             });
         }
 

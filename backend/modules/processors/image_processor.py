@@ -129,15 +129,7 @@ class ImageProcessor:
         # A detecção é feita sempre, mas o desenho das caixas depende da configuração 'show_electronics'
         electronics_detections = []
         if not is_lower_body or self.config.get('show_upper_body', True):
-            # Determina qual pulso usar baseado no lado mais visível
-            wrist_position = None
-            if more_visible_side == 'right' and 16 in landmarks:  # Pulso direito
-                wrist_position = landmarks[16]
-            elif more_visible_side == 'left' and 15 in landmarks:  # Pulso esquerdo
-                wrist_position = landmarks[15]
-            
-            # Detecta eletrônicos considerando o lado processado
-            electronics_detections = self.electronics_detector.detect(frame, wrist_position)
+            electronics_detections = self.electronics_detector.detect(frame)
         
         # Cria uma cópia limpa do frame para desenhar
         processed_frame = frame.copy()
@@ -241,13 +233,13 @@ class ImageProcessor:
         if knee_id in landmarks and knee_angle is not None:
             knee_position = landmarks[knee_id]
             frame_clean = self.visualizer.draw_angle(
-                frame_clean, knee_angle, knee_position, "Joelho", color=(0, 255, 255)  # Amarelo
+                frame_clean, knee_angle, knee_position, "", color=(0, 255, 255)  # Amarelo
             )
         
         if ankle_id in landmarks and ankle_angle is not None:
             ankle_position = landmarks[ankle_id]
             frame_clean = self.visualizer.draw_angle(
-                frame_clean, ankle_angle, ankle_position, "Tornozelo", color=(0, 255, 255)  # Amarelo
+                frame_clean, ankle_angle, ankle_position, "", color=(0, 255, 255)  # Amarelo
             )
         
         # Corta a imagem acima da cintura para mostrar apenas a parte inferior
@@ -425,23 +417,23 @@ class ImageProcessor:
                 else:
                     elbow_id, wrist_id = 13, 15
                 
-                # Coleta informações do ângulo do cotovelo - posicionado próximo ao cotovelo
+                # Coleta informações do ângulo do cotovelo
                 if elbow_id in landmarks and elbow_angle is not None:
                     elbow_position = landmarks[elbow_id]
                     angle_info.append({
                         'angle': elbow_angle,
                         'position': elbow_position,
-                        'label': "Cotovelo",
+                        'label': "",
                         'color': (0, 255, 255)  # Amarelo
                     })
                 
-                # Coleta informações do ângulo do pulso - posicionado próximo ao pulso
+                # Coleta informações do ângulo do pulso
                 if wrist_id in landmarks and wrist_angle is not None:
                     wrist_position = landmarks[wrist_id]
                     angle_info.append({
                         'angle': wrist_angle,
                         'position': wrist_position,
-                        'label': "Pulso",
+                        'label': "",
                         'color': (0, 255, 255)  # Amarelo
                     })
                 

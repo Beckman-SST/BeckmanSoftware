@@ -281,7 +281,7 @@ class PoseVisualizer:
     
     def draw_angle(self, frame, angle, position, label=None, color=None, font_scale=0.7, thickness=2):
         """
-        Desenha um ângulo no frame.
+        Desenha um ângulo no frame com padding inteligente para evitar colisões.
         
         Args:
             frame (numpy.ndarray): Frame onde o ângulo será desenhado
@@ -310,32 +310,56 @@ class PoseVisualizer:
             
             angle_value = float(angle)
             if label:
-                text = f"{label}: {angle_value:.2f} graus"
+                text = f"{label}: {angle_value:.0f} graus"
             else:
-                text = f"{angle_value:.2f} graus"
+                text = f"{angle_value:.0f} graus"
         except (ValueError, TypeError) as e:
             print(f"Erro ao formatar ângulo {angle}: {e}")
             return frame
         
-        # Desloca a posição do texto para a direita do ponto da articulação para evitar sobreposição
-        offset_x = 20  # Deslocamento horizontal em pixels
-        position = (position[0] + offset_x, position[1])
-        
-        # Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame
-        position = adjust_text_position(
-            frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness
-        )
-        
-        # Obtém o tamanho do texto para criar o retângulo de fundo
+        # Calcula o tamanho do texto para determinar o padding necessário
         text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
         text_w, text_h = text_size
         
-        # Adiciona um fundo semi-transparente para destacar o texto
-        # Coordenadas do retângulo (x1, y1) é o canto superior esquerdo e (x2, y2) é o canto inferior direito
-        x1 = position[0] - 5  # 5 pixels de margem à esquerda
-        y1 = position[1] - text_h - 5  # 5 pixels de margem acima
-        x2 = position[0] + text_w + 5  # 5 pixels de margem à direita
-        y2 = position[1] + 5  # 5 pixels de margem abaixo
+        # Padding base para o retângulo de background
+        base_padding = 5
+        
+        # Padding vertical inteligente baseado na altura do texto
+        # Calcula um padding seguro que é proporcional ao tamanho do texto
+        vertical_padding = max(8, int(text_h * 0.4))  # Mínimo 8px, máximo 40% da altura do texto
+        
+        # Ajusta o deslocamento baseado no label para melhor posicionamento
+        # Agora considera o padding vertical calculado
+        if label == "Cotovelo":
+            offset_x = 15  # Deslocamento menor para cotovelo
+            offset_y = -(text_h + vertical_padding)  # Acima, considerando altura do texto + padding
+        elif label == "Pulso":
+            offset_x = 15  # Deslocamento menor para pulso
+            offset_y = vertical_padding  # Abaixo, considerando padding
+        elif label == "Joelho":
+            offset_x = 15  # Deslocamento menor para joelho
+            offset_y = -(text_h + vertical_padding)  # Acima, considerando altura do texto + padding
+        elif label == "Tornozelo":
+            offset_x = 15  # Deslocamento menor para tornozelo
+            offset_y = vertical_padding  # Abaixo, considerando padding
+        else:
+            offset_x = 20  # Deslocamento padrão
+            offset_y = 0
+        
+        # Aplica o deslocamento
+        position = (position[0] + offset_x, position[1] + offset_y)
+        
+        # Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame
+        # e não colida com outros textos (usando padding inteligente)
+        position = self._adjust_text_position_with_smart_padding(
+            frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness, vertical_padding
+        )
+        
+        # Coordenadas do retângulo de background com padding inteligente
+        x1 = position[0] - base_padding
+        y1 = position[1] - text_h - base_padding
+        x2 = position[0] + text_w + base_padding
+        y2 = position[1] + base_padding
         
         # Cria uma cópia do frame para aplicar o retângulo semi-transparente
         overlay = frame.copy()
@@ -357,6 +381,97 @@ class PoseVisualizer:
         )
         
         return frame
+    
+    def _adjust_text_position_with_smart_padding(self, frame, text, position, font, font_scale, color, thickness, vertical_padding):
+        """
+        Ajusta a posição do texto com padding inteligente para evitar colisões.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde o texto será desenhado
+            text (str): Texto a ser desenhado
+            position (tuple): Posição inicial do texto (x, y)
+            font: Fonte do texto
+            font_scale (float): Escala da fonte
+            color (tuple): Cor do texto (B, G, R)
+            thickness (int): Espessura do texto
+            vertical_padding (int): Padding vertical calculado baseado no tamanho do texto
+            
+        Returns:
+            tuple: Posição ajustada do texto (x, y)
+        """
+        # Inicializa o dicionário de posições se não existir
+        if not hasattr(self, '_text_positions'):
+            self._text_positions = {}
+        
+        # Limpa o dicionário de posições para cada novo frame
+        frame_id = hash(str(frame.shape) + str(id(frame)))
+        if not hasattr(self, "_last_frame_id") or self._last_frame_id != frame_id:
+            self._text_positions = {}
+            self._last_frame_id = frame_id
+        
+        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+        text_w, text_h = text_size
+        text_x, text_y = position
+        
+        # Margem horizontal padrão
+        horizontal_margin = 10
+        
+        # Ajusta a posição horizontal para garantir que o texto fique dentro do frame
+        if text_x + text_w > frame.shape[1]:
+            text_x = frame.shape[1] - text_w - horizontal_margin
+        if text_x < 0:
+            text_x = horizontal_margin
+            
+        # Ajusta a posição vertical para garantir que o texto fique dentro do frame
+        if text_y - text_h < 0:
+            text_y = text_h + vertical_padding
+        if text_y > frame.shape[0]:
+            text_y = frame.shape[0] - vertical_padding
+        
+        # Calcula o retângulo do texto atual com padding inteligente
+        rect = (
+            text_x - horizontal_margin, 
+            text_y - text_h - vertical_padding, 
+            text_x + text_w + horizontal_margin, 
+            text_y + vertical_padding
+        )
+        
+        # Tenta encontrar uma posição que não colida com outros textos
+        attempts = 0
+        max_attempts = 8  # Limite de tentativas para evitar loop infinito
+        
+        while attempts < max_attempts:
+            collision = False
+            
+            for existing_rect in self._text_positions.values():
+                # Verifica se há colisão entre os retângulos
+                if (rect[0] < existing_rect[2] and rect[2] > existing_rect[0] and
+                    rect[1] < existing_rect[3] and rect[3] > existing_rect[1]):
+                    collision = True
+                    # Move o texto para baixo usando o padding vertical inteligente
+                    text_y += text_h + (vertical_padding * 2)
+                    # Atualiza o retângulo
+                    rect = (
+                        text_x - horizontal_margin, 
+                        text_y - text_h - vertical_padding, 
+                        text_x + text_w + horizontal_margin, 
+                        text_y + vertical_padding
+                    )
+                    break
+            
+            if not collision or text_y > frame.shape[0] - vertical_padding:
+                break
+                
+            attempts += 1
+        
+        # Se ainda estiver fora dos limites do frame após ajustes, força dentro dos limites
+        if text_y > frame.shape[0] - vertical_padding:
+            text_y = frame.shape[0] - vertical_padding
+        
+        # Armazena a posição final do texto
+        self._text_positions[text] = rect
+        
+        return (text_x, text_y)
     
     def apply_face_blur(self, frame, face_landmarks=None, eye_landmarks=None):
         """

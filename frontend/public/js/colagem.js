@@ -181,11 +181,16 @@ class ColagemManager {
         this.selectedImagesPreview = document.getElementById('selectedImagesPreview');
         this.finishGroupBtn = document.getElementById('finishGroupBtn');
         this.createCollageBtn = document.getElementById('createCollageBtn');
+        this.cancelCurrentGroupBtn = document.getElementById('cancelCurrentGroupBtn');
         this.clearSelectionBtn = document.getElementById('clearSelectionBtn');
         this.collageQueue = document.getElementById('collageQueue');
         this.queueItems = document.getElementById('queueItems');
+        
+        // Drag functionality
+        this.dragHandle = this.selectionPanel ? this.selectionPanel.querySelector('.drag-handle') : null;
+        this.isDragging = false;
+        this.dragOffset = { x: 0, y: 0 };
     }
-
     /**
      * Attach event listeners
      */
@@ -210,13 +215,19 @@ class ColagemManager {
             });
         }
         
+        if (this.cancelCurrentGroupBtn) {
+            this.cancelCurrentGroupBtn.addEventListener('click', () => {
+                this.cancelCurrentGroup();
+            });
+        }
+        
         if (this.clearSelectionBtn) {
             this.clearSelectionBtn.addEventListener('click', () => {
                 this.clearAllSelections();
             });
         }
 
-        // Clear markings confirmation modal
+        // Clear markings confirmation
         const confirmClearMarkingsBtn = document.getElementById('confirmClearMarkings');
         if (confirmClearMarkingsBtn) {
             confirmClearMarkingsBtn.addEventListener('click', () => {
@@ -229,6 +240,9 @@ class ColagemManager {
             });
         }
 
+        // Drag functionality for selection panel
+        this.setupDragFunctionality();
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
@@ -236,7 +250,7 @@ class ColagemManager {
                 this.refreshImages();
             }
             if (e.key === 'Escape') {
-                this.clearCurrentSelection();
+                this.cancelCurrentGroup();
             }
         });
     }
@@ -677,46 +691,11 @@ class ColagemManager {
     }
 
     /**
-     * Clear current selection only
+     * Clear current selection only (deprecated - use cancelCurrentGroup instead)
      */
     clearCurrentSelection() {
-        // Remove visual indicators for each selected image
-        this.selectedImages.forEach(img => {
-            const card = document.querySelector(`[data-image-id="${img.id}"]`);
-            if (card) {
-                card.classList.remove('selected');
-                const groupNumber = card.querySelector('.selection-group-number');
-                if (groupNumber) {
-                    groupNumber.remove();
-                }
-            }
-        });
-        
-        this.selectedImages = [];
-        this.updateSelectionPanel();
-    }
-
-    /**
-     * Clear all selections and groups
-     */
-    clearAllSelections() {
-        this.selectedImages = [];
-        this.collageGroups = [];
-        this.currentGroupNumber = 1;
-        this.updateSelectionPanel();
-        this.updateQueueDisplay();
-        
-        // Remove selection visual indicators
-        document.querySelectorAll('.image-card.selected').forEach(card => {
-            card.classList.remove('selected');
-        });
-        
-        // Remove all group number indicators
-        document.querySelectorAll('.selection-group-number').forEach(indicator => {
-            indicator.remove();
-        });
-        
-        this.showMessage('Todas as seleções foram limpas!', 'info');
+        // Redirect to the new method for consistency
+        this.cancelCurrentGroup();
     }
 
     /**
@@ -730,11 +709,17 @@ class ColagemManager {
                 card.classList.add('used-in-collage');
                 
                 // Add check mark if not already present
-                if (!card.querySelector('.collage-check-mark')) {
+                if (!card.querySelector('.used-check-mark')) {
                     const checkMark = document.createElement('div');
-                    checkMark.className = 'collage-check-mark';
+                    checkMark.className = 'used-check-mark';
                     checkMark.innerHTML = '<i class="bi bi-check"></i>';
-                    card.insertBefore(checkMark, card.firstChild);
+                    card.appendChild(checkMark);
+                }
+            } else {
+                card.classList.remove('used-in-collage');
+                const checkMark = card.querySelector('.used-check-mark');
+                if (checkMark) {
+                    checkMark.remove();
                 }
             }
         });
@@ -1031,6 +1016,175 @@ class ColagemManager {
                 }
             }, 500);
         }
+    }
+
+    /**
+     * Setup drag functionality for selection panel
+     */
+    setupDragFunctionality() {
+        if (!this.dragHandle || !this.selectionPanel) return;
+
+        // Mouse events
+        this.dragHandle.addEventListener('mousedown', (e) => {
+            this.startDrag(e);
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            this.drag(e);
+        });
+
+        document.addEventListener('mouseup', () => {
+            this.stopDrag();
+        });
+
+        // Touch events for mobile
+        this.dragHandle.addEventListener('touchstart', (e) => {
+            this.startDrag(e.touches[0]);
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (this.isDragging) {
+                e.preventDefault();
+                this.drag(e.touches[0]);
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            this.stopDrag();
+        });
+    }
+
+    /**
+     * Start dragging the selection panel
+     */
+    startDrag(e) {
+        this.isDragging = true;
+        this.selectionPanel.classList.add('dragging');
+        
+        const rect = this.selectionPanel.getBoundingClientRect();
+        this.dragOffset.x = e.clientX - rect.left;
+        this.dragOffset.y = e.clientY - rect.top;
+        
+        // Prevent text selection during drag
+        document.body.style.userSelect = 'none';
+    }
+
+    /**
+     * Handle dragging movement
+     */
+    drag(e) {
+        if (!this.isDragging) return;
+
+        const x = e.clientX - this.dragOffset.x;
+        const y = e.clientY - this.dragOffset.y;
+
+        // Get viewport dimensions
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const panelRect = this.selectionPanel.getBoundingClientRect();
+
+        // Constrain to viewport bounds
+        const constrainedX = Math.max(0, Math.min(x, viewportWidth - panelRect.width));
+        const constrainedY = Math.max(0, Math.min(y, viewportHeight - panelRect.height));
+
+        // Apply position
+        this.selectionPanel.style.left = constrainedX + 'px';
+        this.selectionPanel.style.top = constrainedY + 'px';
+        this.selectionPanel.style.right = 'auto';
+        this.selectionPanel.style.bottom = 'auto';
+    }
+
+    /**
+     * Stop dragging the selection panel
+     */
+    stopDrag() {
+        if (!this.isDragging) return;
+        
+        this.isDragging = false;
+        this.selectionPanel.classList.remove('dragging');
+        
+        // Restore text selection
+        document.body.style.userSelect = '';
+    }
+
+    /**
+     * Cancel current group selection (only current selection, not all groups)
+     */
+    cancelCurrentGroup() {
+        if (this.selectedImages.length === 0) {
+            this.showMessage('Nenhuma seleção atual para cancelar!', 'info');
+            return;
+        }
+
+        // Remove visual indicators for each selected image
+        this.selectedImages.forEach(img => {
+            const card = document.querySelector(`[data-image-id="${img.id}"]`);
+            if (card) {
+                card.classList.remove('selected');
+                const groupNumber = card.querySelector('.selection-group-number');
+                if (groupNumber) {
+                    groupNumber.remove();
+                }
+            }
+        });
+
+        // Clear current selection
+        const selectionCount = this.selectedImages.length;
+        this.selectedImages = [];
+
+        // Clear group name input
+        if (this.groupNameInput) {
+            this.groupNameInput.value = '';
+        }
+
+        // Update panel
+        this.updateSelectionPanel();
+        this.showMessage(`Seleção atual cancelada (${selectionCount} imagens)!`, 'info');
+    }
+
+    /**
+     * Clear all selections and groups (original functionality)
+     */
+    clearAllSelections() {
+        // Clear current selection
+        this.selectedImages.forEach(img => {
+            const card = document.querySelector(`[data-image-id="${img.id}"]`);
+            if (card) {
+                card.classList.remove('selected');
+                const groupNumber = card.querySelector('.selection-group-number');
+                if (groupNumber) {
+                    groupNumber.remove();
+                }
+            }
+        });
+
+        // Clear all groups and their visual indicators
+        this.collageGroups.forEach(group => {
+            group.images.forEach(img => {
+                const card = document.querySelector(`[data-image-id="${img.id}"]`);
+                if (card) {
+                    card.classList.remove('selected');
+                    const groupNumber = card.querySelector('.selection-group-number');
+                    if (groupNumber) {
+                        groupNumber.remove();
+                    }
+                }
+            });
+        });
+
+        // Reset all state
+        this.selectedImages = [];
+        this.collageGroups = [];
+        this.currentGroupNumber = 1;
+
+        // Clear group name input
+        if (this.groupNameInput) {
+            this.groupNameInput.value = '';
+        }
+
+        // Update panel
+        this.updateSelectionPanel();
+        this.showMessage('Todas as seleções e grupos foram limpos!', 'info');
     }
 
     /**

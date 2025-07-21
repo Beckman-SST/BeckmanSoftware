@@ -208,6 +208,55 @@
             z-index: 1000;
             border: 1px solid #e9ecef;
             display: none;
+            cursor: move;
+            user-select: none;
+        }
+        
+        .selection-panel.dragging {
+            cursor: grabbing;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+            transform: scale(1.02);
+            transition: none;
+        }
+        
+        .selection-panel .drag-handle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            cursor: grab;
+            border-radius: 15px 15px 0 0;
+            background: linear-gradient(135deg, rgba(0,123,255,0.1) 0%, rgba(0,123,255,0.05) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid rgba(0,123,255,0.1);
+        }
+        
+        .selection-panel .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .selection-panel .drag-handle::before {
+            content: '';
+            width: 30px;
+            height: 4px;
+            background: rgba(0,123,255,0.3);
+            border-radius: 2px;
+            position: relative;
+        }
+        
+        .selection-panel .drag-handle::after {
+            content: '';
+            width: 20px;
+            height: 4px;
+            background: rgba(0,123,255,0.2);
+            border-radius: 2px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, calc(-50% + 6px));
         }
         
         .selection-panel.show {
@@ -231,6 +280,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
+            margin-top: 2rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid #e9ecef;
         }
@@ -505,6 +555,8 @@
 
     <!-- Selection Panel -->
     <div id="selectionPanel" class="selection-panel">
+        <div class="drag-handle" title="Clique e arraste para mover o painel"></div>
+        
         <div class="selection-header">
             <h6><i class="bi bi-check-square me-2"></i>Seleção para Colagem</h6>
             <span id="selectionCounter" class="selection-counter">0/3</span>
@@ -527,8 +579,11 @@
             <button id="createCollageBtn" class="btn btn-success btn-sm" disabled>
                 <i class="bi bi-grid-3x3 me-1"></i>Criar Colagens
             </button>
+            <button id="cancelCurrentGroupBtn" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-x-circle me-1"></i>Cancelar Grupo
+            </button>
             <button id="clearSelectionBtn" class="btn btn-outline-danger btn-sm">
-                <i class="bi bi-x-circle me-1"></i>Limpar
+                <i class="bi bi-trash me-1"></i>Limpar Tudo
             </button>
         </div>
         

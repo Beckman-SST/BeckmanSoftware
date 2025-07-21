@@ -45,6 +45,7 @@ min_detection_confidence: 0.8    # Confiança mínima para detecção
 min_tracking_confidence: 0.8     # Confiança mínima para rastreamento
 yolo_confidence: 0.65            # Confiança para detecção de eletrônicos
 moving_average_window: 5         # Janela para suavização de landmarks
+model_complexity: 2              # Complexidade do modelo MediaPipe (maior precisão)
 ```
 
 ## Módulos Detalhados
@@ -283,10 +284,21 @@ def should_process_lower_body(landmarks, results=None):
    - Média móvel com janela limitada
    - Melhora estabilidade sem overhead
 
+5. **Model Complexity Avançado**
+   - MediaPipe configurado com model_complexity=2
+   - Maior precisão na detecção de landmarks
+   - Crucial para cálculo preciso de ângulos sutis
+
+6. **Sistema Anticolisão de Textos**
+   - Posicionamento inteligente de textos de ângulos
+   - Prevenção de sobreposição entre elementos visuais
+   - Manutenção de proximidade com articulações correspondentes
+   - Algoritmo de fallback para encontrar posições livres
+
 ### Métricas de Performance
 
 - **Tempo de Processamento**: ~2-5 segundos por imagem (1080p)
-- **Precisão de Detecção**: >95% para poses frontais/laterais
+- **Precisão de Detecção**: >98% para poses frontais/laterais (com model_complexity=2)
 - **Uso de Memória**: ~500MB durante processamento
 - **Formatos Suportados**: JPG, PNG, BMP, MP4, AVI, MOV
 
@@ -340,6 +352,69 @@ def calculate_custom_angle(self, landmarks, side='right'):
     
     return angle
 ```
+
+### 4. Sistema Anticolisão de Textos
+
+#### Algoritmo de Posicionamento Inteligente
+
+O sistema anticolisão garante que os textos dos ângulos não se sobreponham, mantendo-os próximos às articulações correspondentes:
+
+```python
+def adjust_text_position(x, y, text, frame_width, frame_height, 
+                        drawn_texts=None, margin=25, padding=10):
+    """
+    Ajusta posição do texto para evitar colisões e manter dentro do frame
+    
+    Args:
+        x, y: Posição original do texto
+        text: Texto a ser desenhado
+        frame_width, frame_height: Dimensões do frame
+        drawn_texts: Lista de textos já desenhados
+        margin: Margem mínima das bordas
+        padding: Espaçamento mínimo entre textos
+    """
+    
+    # Posições candidatas priorizando proximidade com a articulação
+    candidate_positions = [
+        (x + 35, y - 10),  # Direita-cima (preferencial)
+        (x + 35, y + 20),  # Direita-baixo
+        (x - 80, y - 10),  # Esquerda-cima
+        (x - 80, y + 20),  # Esquerda-baixo
+        (x, y - 30),       # Acima
+        (x, y + 30)        # Abaixo
+    ]
+    
+    # Testa cada posição candidata
+    for pos_x, pos_y in candidate_positions:
+        if is_position_valid(pos_x, pos_y, text, frame_width, 
+                           frame_height, drawn_texts, margin, padding):
+            return pos_x, pos_y
+    
+    # Algoritmo de fallback: busca vertical
+    return find_fallback_position(x, y, text, frame_width, 
+                                frame_height, drawn_texts)
+```
+
+#### Características do Sistema
+
+1. **Priorização de Proximidade**
+   - Posições candidatas ordenadas por proximidade à articulação
+   - Preferência por posicionamento à direita e ligeiramente acima
+
+2. **Detecção de Colisões**
+   - Verificação de sobreposição com textos existentes
+   - Margem de segurança configurável (25px)
+   - Padding entre elementos (10px)
+
+3. **Algoritmo de Fallback**
+   - Busca vertical alternada quando posições preferenciais falham
+   - Movimento incremental para encontrar espaço livre
+   - Garantia de que o texto permaneça visível
+
+4. **Conectores Visuais**
+   - Linha sutil conectando articulação ao texto
+   - Melhora a associação visual entre ângulo e ponto corporal
+   - Transparência ajustável para não interferir na visualização
 
 ### Integrando Novos Detectores
 

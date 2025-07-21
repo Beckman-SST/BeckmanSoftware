@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import mediapipe as mp
+from ..core.utils import adjust_text_position
 
 # Configurações globais do MediaPipe
 mpDraw = mp.solutions.drawing_utils
@@ -70,6 +71,99 @@ class VideoVisualizer:
         """
         if not results.pose_landmarks:
             return frame
+    
+    def draw_angle_text(self, frame, angle, position, label=None, color=(255, 255, 255), font_scale=0.6, thickness=2):
+        """
+        Desenha o texto de um ângulo no frame com sistema avançado de anticolisão.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde o texto será desenhado
+            angle (float): Valor do ângulo
+            position (tuple): Posição (x, y) da articulação de referência
+            label (str): Rótulo adicional para o ângulo
+            color (tuple): Cor do texto (B, G, R)
+            font_scale (float): Escala da fonte
+            thickness (int): Espessura do texto
+            
+        Returns:
+            numpy.ndarray: Frame com o texto do ângulo desenhado
+        """
+        if angle is None:
+            return frame
+        
+        # Formata o texto do ângulo (sem símbolo de grau)
+        try:
+            angle_value = float(angle)
+            if label:
+                text = f"{label}: {angle_value:.1f}"
+            else:
+                text = f"{angle_value:.1f}"
+        except (ValueError, TypeError) as e:
+            print(f"Erro ao formatar ângulo {angle}: {e}")
+            return frame
+        
+        # Offset inicial para separar da articulação
+        offset_x = 40  # Maior offset para vídeos
+        offset_y = -15  # Pequeno offset vertical para cima
+        initial_position = (position[0] + offset_x, position[1] + offset_y)
+        
+        # Ajusta a posição do texto usando o sistema avançado de anticolisão
+        adjusted_position = adjust_text_position(
+            frame, text, initial_position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness
+        )
+        
+        # Obtém o tamanho do texto para calcular posição do símbolo de grau
+        text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        text_w, text_h = text_size
+        
+        # Padding para o fundo do texto (incluindo espaço para o símbolo)
+        bg_padding = 6
+        symbol_space = 12  # Espaço extra para o símbolo de grau
+        
+        # Adiciona um fundo semi-transparente para destacar o texto
+        x1 = adjusted_position[0] - bg_padding
+        y1 = adjusted_position[1] - text_h - bg_padding
+        x2 = adjusted_position[0] + text_w + symbol_space + bg_padding
+        y2 = adjusted_position[1] + bg_padding
+        
+        # Garante que o retângulo de fundo fique dentro dos limites do frame
+        x1 = max(0, x1)
+        y1 = max(0, y1)
+        x2 = min(frame.shape[1], x2)
+        y2 = min(frame.shape[0], y2)
+        
+        # Cria uma cópia do frame para aplicar o retângulo semi-transparente
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), -1)  # Retângulo preto preenchido
+        
+        # Aplica o retângulo com transparência
+        alpha = 0.7
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+        
+        # Desenha uma linha sutil conectando a articulação ao texto
+        line_color = tuple(int(c * 0.7) for c in color)  # Cor mais escura que o texto
+        cv2.line(frame, position, adjusted_position, line_color, 1)
+        
+        # Desenha o texto sobre o retângulo
+        cv2.putText(
+            frame,
+            text,
+            adjusted_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_scale,
+            color,
+            thickness
+        )
+        
+        # Desenha o símbolo de grau manualmente (pequeno círculo)
+        symbol_x = adjusted_position[0] + text_w + 3  # 3 pixels de espaço após o texto
+        symbol_y = adjusted_position[1] - int(text_h * 0.7)  # Posição superior
+        symbol_radius = max(2, int(font_scale * 3))  # Raio proporcional à fonte
+        
+        # Desenha o círculo do símbolo de grau
+        cv2.circle(frame, (symbol_x, symbol_y), symbol_radius, color, thickness//2 or 1)
+        
+        return frame
             
         try:
             # Obtém dimensões do frame

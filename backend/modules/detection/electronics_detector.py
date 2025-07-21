@@ -25,7 +25,7 @@ class ElectronicsDetector:
         """
         pass
     
-    def detect(self, frame, wrist_position=None, is_lower_body=False):
+    def detect(self, frame, wrist_position=None, is_lower_body=False, eye_position=None):
         """
         Detecta dispositivos eletrônicos em um frame.
         
@@ -33,6 +33,7 @@ class ElectronicsDetector:
             frame (numpy.ndarray): Frame a ser processado
             wrist_position (tuple, optional): Posição do pulso para encontrar o dispositivo mais próximo
             is_lower_body (bool, optional): Indica se é análise da parte inferior do corpo
+            eye_position (tuple, optional): Posição dos olhos para melhorar a seleção do dispositivo
             
         Returns:
             list: Lista de detecções (classe, confiança, caixa delimitadora)
@@ -42,7 +43,7 @@ class ElectronicsDetector:
             return []
             
         # Usa o detector YOLOv8 para detectar eletrônicos
-        yolo_detections = self.detector.detect(frame, wrist_position, is_lower_body)
+        yolo_detections = self.detector.detect(frame, wrist_position, is_lower_body, eye_position)
         
         # Converte o formato das detecções para manter compatibilidade com o código existente
         detections = []

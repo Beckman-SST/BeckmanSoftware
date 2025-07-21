@@ -292,16 +292,41 @@
                                         </div>
                                         
                                         <div class="mb-3">
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="process_lower_body" 
-                                                       name="process_lower_body" checked>
-                                                <label class="form-check-label" for="process_lower_body">
-                                                    Processar Corpo Inferior
-                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Inclui o corpo inferior no processamento de análise postural. Desabilitar pode acelerar o processamento se apenas a postura superior for relevante."></i>
-                                                </label>
-                                            </div>
-                                            <div class="form-text">
-                                                Inclui processamento do corpo inferior
+                                            <label class="form-label fw-semibold">
+                                                Modo de Processamento
+                                                <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Define como o sistema deve processar a análise postural: automaticamente baseado na imagem, forçar apenas parte superior, ou forçar apenas parte inferior."></i>
+                                            </label>
+                                            <div class="mt-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="processing_mode" 
+                                                           id="processing_auto" value="auto" checked>
+                                                    <label class="form-check-label" for="processing_auto">
+                                                        <strong>Processar Automaticamente</strong>
+                                                        <div class="form-text small">
+                                                            O sistema decide automaticamente se deve processar parte superior ou inferior baseado na análise da imagem
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check mt-2">
+                                                    <input class="form-check-input" type="radio" name="processing_mode" 
+                                                           id="processing_upper" value="upper_only">
+                                                    <label class="form-check-label" for="processing_upper">
+                                                        <strong>Processar Somente Parte Superior</strong>
+                                                        <div class="form-text small">
+                                                            Força o processamento apenas da parte superior do corpo (cabeça, pescoço, ombros, braços)
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check mt-2">
+                                                    <input class="form-check-input" type="radio" name="processing_mode" 
+                                                           id="processing_lower" value="lower_only">
+                                                    <label class="form-check-label" for="processing_lower">
+                                                        <strong>Processar Somente Parte Inferior</strong>
+                                                        <div class="form-text small">
+                                                            Força o processamento apenas da parte inferior do corpo (quadris, pernas, joelhos, pés)
+                                                        </div>
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

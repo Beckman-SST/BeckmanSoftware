@@ -41,7 +41,7 @@ class ElectronicsDetectorYOLOv8:
             print(f"Erro ao inicializar YOLOv8: {e}")
             self.yolo_initialized = False
     
-    def detect(self, frame, wrist_position=None, is_lower_body=False):
+    def detect(self, frame, wrist_position=None, is_lower_body=False, eye_position=None):
         """
         Detecta dispositivos eletrônicos em um frame.
         
@@ -49,6 +49,7 @@ class ElectronicsDetectorYOLOv8:
             frame (numpy.ndarray): Frame a ser processado
             wrist_position (tuple, optional): Posição do pulso para encontrar o dispositivo mais próximo
             is_lower_body (bool, optional): Indica se é análise da parte inferior do corpo
+            eye_position (tuple, optional): Posição dos olhos para melhorar a seleção do dispositivo
             
         Returns:
             list: Lista de detecções (classe, confiança, caixa delimitadora)
@@ -106,14 +107,129 @@ class ElectronicsDetectorYOLOv8:
             'bbox': tuple(map(int, box))
         } for box, cls, conf in zip(boxes, classes, confs)]
         
-        # Se uma posição de pulso for fornecida, retorna apenas a detecção mais próxima
+        # Se uma posição de pulso for fornecida, usa algoritmo inteligente de seleção
         if wrist_position:
-            centers = np.array([[int((box[0] + box[2])//2), int((box[1] + box[3])//2)] for box in boxes])
-            distances = np.linalg.norm(centers - np.array(wrist_position), axis=1)  # Distância euclidiana
-            closest_idx = np.argmin(distances)
-            return [detections[closest_idx]]  # Retorna uma lista com a detecção mais próxima
+            best_device = self._select_best_device(detections, wrist_position, eye_position, frame.shape)
+            return [best_device] if best_device else []
             
         return detections
+    
+    def _select_best_device(self, detections, wrist_position, eye_position=None, frame_shape=None):
+        """
+        Seleciona o melhor dispositivo baseado em múltiplos critérios.
+        
+        Args:
+            detections (list): Lista de detecções
+            wrist_position (tuple): Posição do pulso
+            eye_position (tuple, optional): Posição dos olhos
+            frame_shape (tuple, optional): Dimensões do frame (height, width, channels)
+            
+        Returns:
+            dict: Melhor detecção ou None se nenhuma for adequada
+        """
+        if not detections:
+            return None
+        
+        if len(detections) == 1:
+            return detections[0]
+        
+        scores = []
+        
+        for detection in detections:
+            x1, y1, x2, y2 = detection['bbox']
+            center_x = (x1 + x2) // 2
+            center_y = (y1 + y2) // 2
+            device_center = (center_x, center_y)
+            
+            # Calcula área do dispositivo
+            device_area = (x2 - x1) * (y2 - y1)
+            
+            # Critério 1: Distância ao pulso (peso 30%)
+            distance_to_wrist = np.linalg.norm(np.array(device_center) - np.array(wrist_position))
+            max_distance = np.sqrt(frame_shape[0]**2 + frame_shape[1]**2) if frame_shape else 1000
+            distance_score = 1.0 - (distance_to_wrist / max_distance)
+            
+            # Critério 2: Posição frontal (peso 25%)
+            # Dispositivos mais centralizados horizontalmente são preferidos
+            frame_center_x = frame_shape[1] // 2 if frame_shape else 640
+            horizontal_distance = abs(center_x - frame_center_x)
+            max_horizontal_distance = frame_shape[1] // 2 if frame_shape else 640
+            frontal_score = 1.0 - (horizontal_distance / max_horizontal_distance)
+            
+            # Critério 3: Tamanho do dispositivo (peso 20%)
+            # Dispositivos maiores (monitores/TVs) são preferidos para análise ergonômica
+            frame_area = frame_shape[0] * frame_shape[1] if frame_shape else 640 * 480
+            size_ratio = device_area / frame_area
+            # Normaliza para que dispositivos entre 10% e 50% da tela tenham score máximo
+            if 0.1 <= size_ratio <= 0.5:
+                size_score = 1.0
+            elif size_ratio < 0.1:
+                size_score = size_ratio / 0.1  # Penaliza dispositivos muito pequenos
+            else:
+                size_score = max(0.0, 1.0 - (size_ratio - 0.5) / 0.3)  # Penaliza dispositivos muito grandes
+            
+            # Critério 4: Confiança da detecção (peso 15%)
+            confidence_score = detection['confidence']
+            
+            # Critério 5: Alinhamento com direção do olhar (peso 10%)
+            eye_alignment_score = 0.5  # Score neutro por padrão
+            if eye_position:
+                # Calcula se o dispositivo está na direção do olhar
+                eye_to_device = np.array(device_center) - np.array(eye_position)
+                eye_to_wrist = np.array(wrist_position) - np.array(eye_position)
+                
+                # Calcula o ângulo entre os vetores
+                if np.linalg.norm(eye_to_device) > 0 and np.linalg.norm(eye_to_wrist) > 0:
+                    cos_angle = np.dot(eye_to_device, eye_to_wrist) / (
+                        np.linalg.norm(eye_to_device) * np.linalg.norm(eye_to_wrist)
+                    )
+                    cos_angle = np.clip(cos_angle, -1.0, 1.0)
+                    angle = np.arccos(cos_angle)
+                    # Converte para score (ângulos menores = score maior)
+                    eye_alignment_score = 1.0 - (angle / np.pi)
+            
+            # Critério 6: Tipo de dispositivo (peso extra para monitores)
+            device_type_score = 1.0
+            if detection['class'] in ['tv', 'monitor']:
+                device_type_score = 1.2  # Bonus para monitores/TVs
+            elif detection['class'] == 'laptop':
+                device_type_score = 1.0  # Score neutro para laptops
+            
+            # Calcula score final ponderado
+            final_score = (
+                distance_score * 0.30 +
+                frontal_score * 0.25 +
+                size_score * 0.20 +
+                confidence_score * 0.15 +
+                eye_alignment_score * 0.10
+            ) * device_type_score
+            
+            scores.append({
+                'detection': detection,
+                'score': final_score,
+                'details': {
+                    'distance_score': distance_score,
+                    'frontal_score': frontal_score,
+                    'size_score': size_score,
+                    'confidence_score': confidence_score,
+                    'eye_alignment_score': eye_alignment_score,
+                    'device_type_score': device_type_score
+                }
+            })
+        
+        # Ordena por score e retorna o melhor
+        scores.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Debug: imprime scores para análise
+        print(f"Seleção de dispositivo - {len(detections)} detectados:")
+        for i, score_info in enumerate(scores):
+            det = score_info['detection']
+            details = score_info['details']
+            print(f"  {i+1}. {det['class']} (conf: {det['confidence']:.2f}) - Score: {score_info['score']:.3f}")
+            print(f"     Distância: {details['distance_score']:.2f}, Frontal: {details['frontal_score']:.2f}, "
+                  f"Tamanho: {details['size_score']:.2f}, Olhar: {details['eye_alignment_score']:.2f}")
+        
+        return scores[0]['detection']
     
     def draw_detections(self, frame, detections):
         """

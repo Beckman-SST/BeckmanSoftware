@@ -103,7 +103,7 @@ _text_positions = {}
 def adjust_text_position(frame, text, position, font, font_scale, color, thickness):
     """
     Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame
-    e não sobreponha outros textos já desenhados.
+    e não sobreponha outros textos já desenhados, com sistema avançado de anticolisão.
     
     Args:
         frame (numpy.ndarray): Frame onde o texto será desenhado
@@ -127,58 +127,119 @@ def adjust_text_position(frame, text, position, font, font_scale, color, thickne
     
     text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
     text_w, text_h = text_size
-    text_x, text_y = position
+    original_x, original_y = position
     
-    # Margem adicional ao redor do texto para evitar sobreposição
-    margin = 15
+    # Margem aumentada para melhor separação entre textos
+    margin = 25  # Aumentado de 15 para 25 pixels
+    padding = 10  # Padding adicional para o fundo do texto
     
-    # Ajusta a posição horizontal para garantir que o texto fique dentro do frame
-    if text_x + text_w > frame.shape[1]:
-        text_x = frame.shape[1] - text_w - margin
-    if text_x < 0:
-        text_x = margin
+    # Lista de posições candidatas em ordem de prioridade
+    # Mantém proximidade com a articulação original
+    candidate_positions = [
+        (original_x, original_y),  # Posição original
+        (original_x + 30, original_y),  # Direita
+        (original_x - 30, original_y),  # Esquerda
+        (original_x, original_y + 30),  # Abaixo
+        (original_x, original_y - 30),  # Acima
+        (original_x + 45, original_y + 15),  # Diagonal direita-baixo
+        (original_x - 45, original_y + 15),  # Diagonal esquerda-baixo
+        (original_x + 45, original_y - 15),  # Diagonal direita-cima
+        (original_x - 45, original_y - 15),  # Diagonal esquerda-cima
+    ]
+    
+    best_position = None
+    min_distance = float('inf')
+    
+    for candidate_x, candidate_y in candidate_positions:
+        # Ajusta a posição para garantir que fique dentro do frame
+        text_x = max(margin, min(candidate_x, frame.shape[1] - text_w - margin))
+        text_y = max(text_h + margin, min(candidate_y, frame.shape[0] - margin))
         
-    # Ajusta a posição vertical para garantir que o texto fique dentro do frame
-    if text_y - text_h < 0:
-        text_y = text_h + margin
-    if text_y > frame.shape[0]:
-        text_y = frame.shape[0] - margin
-    
-    # Verifica se a posição atual colide com algum texto já desenhado
-    # e ajusta a posição vertical se necessário
-    rect = (text_x - margin, text_y - text_h - margin, text_x + text_w + margin, text_y + margin)
-    
-    # Tenta encontrar uma posição que não colida com outros textos
-    attempts = 0
-    max_attempts = 10  # Limite de tentativas para evitar loop infinito
-    
-    while attempts < max_attempts:
-        collision = False
+        # Calcula o retângulo com margem aumentada
+        rect = (
+            text_x - margin - padding, 
+            text_y - text_h - margin - padding, 
+            text_x + text_w + margin + padding, 
+            text_y + margin + padding
+        )
         
+        # Verifica colisão com textos existentes
+        has_collision = False
         for existing_rect in _text_positions.values():
-            # Verifica se há colisão entre os retângulos
             if (rect[0] < existing_rect[2] and rect[2] > existing_rect[0] and
                 rect[1] < existing_rect[3] and rect[3] > existing_rect[1]):
-                collision = True
-                # Move o texto para baixo
-                text_y += text_h + margin * 2
-                # Atualiza o retângulo
-                rect = (text_x - margin, text_y - text_h - margin, text_x + text_w + margin, text_y + margin)
+                has_collision = True
                 break
         
-        if not collision or text_y > frame.shape[0] - margin:
-            break
+        # Se não há colisão, calcula a distância da posição original
+        if not has_collision:
+            distance = math.sqrt((text_x - original_x)**2 + (text_y - original_y)**2)
+            if distance < min_distance:
+                min_distance = distance
+                best_position = (text_x, text_y, rect)
+    
+    # Se nenhuma posição candidata funcionou, usa algoritmo de fallback
+    if best_position is None:
+        text_x, text_y = original_x, original_y
+        
+        # Ajusta para dentro do frame
+        text_x = max(margin, min(text_x, frame.shape[1] - text_w - margin))
+        text_y = max(text_h + margin, min(text_y, frame.shape[0] - margin))
+        
+        # Algoritmo de fallback: move verticalmente até encontrar espaço
+        attempts = 0
+        max_attempts = 15  # Aumentado para mais tentativas
+        step = text_h + margin
+        
+        while attempts < max_attempts:
+            rect = (
+                text_x - margin - padding, 
+                text_y - text_h - margin - padding, 
+                text_x + text_w + margin + padding, 
+                text_y + margin + padding
+            )
             
-        attempts += 1
+            collision = False
+            for existing_rect in _text_positions.values():
+                if (rect[0] < existing_rect[2] and rect[2] > existing_rect[0] and
+                    rect[1] < existing_rect[3] and rect[3] > existing_rect[1]):
+                    collision = True
+                    break
+            
+            if not collision:
+                best_position = (text_x, text_y, rect)
+                break
+            
+            # Alterna entre mover para baixo e para cima
+            if attempts % 2 == 0:
+                text_y += step
+            else:
+                text_y = original_y - (step * ((attempts + 1) // 2))
+            
+            # Garante que permaneça dentro do frame
+            text_y = max(text_h + margin, min(text_y, frame.shape[0] - margin))
+            
+            attempts += 1
+        
+        # Se ainda não encontrou posição, força uma posição válida
+        if best_position is None:
+            text_x = max(margin, min(original_x, frame.shape[1] - text_w - margin))
+            text_y = max(text_h + margin, min(original_y, frame.shape[0] - margin))
+            rect = (
+                text_x - margin - padding, 
+                text_y - text_h - margin - padding, 
+                text_x + text_w + margin + padding, 
+                text_y + margin + padding
+            )
+            best_position = (text_x, text_y, rect)
     
-    # Se ainda estiver fora dos limites do frame após ajustes, força dentro dos limites
-    if text_y > frame.shape[0] - margin:
-        text_y = frame.shape[0] - margin
+    final_x, final_y, final_rect = best_position
     
-    # Armazena a posição final do texto
-    _text_positions[text] = rect
+    # Armazena a posição final do texto com identificador único
+    text_id = f"{text}_{len(_text_positions)}"
+    _text_positions[text_id] = final_rect
     
-    return (text_x, text_y)
+    return (int(final_x), int(final_y))
 
 def get_timestamp():
     """

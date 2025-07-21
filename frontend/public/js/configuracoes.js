@@ -12,7 +12,7 @@ class ConfigManager {
             show_angles: true,
             show_upper_body: true,
             show_lower_body: true,
-            process_lower_body: true
+            processing_mode: 'auto'  // Novo campo para modo de processamento
         };
         this.init();
     }
@@ -116,14 +116,22 @@ class ConfigManager {
         const fullConfig = { ...this.defaultConfig, ...config };
         
         Object.keys(fullConfig).forEach(key => {
-            const element = document.querySelector(`[name="${key}"]`);
-            if (element) {
-                if (element.type === 'checkbox') {
-                    element.checked = fullConfig[key];
-                } else {
-                    element.value = fullConfig[key];
-                    if (element.type === 'range') {
-                        this.updateRangeValue(element);
+            if (key === 'processing_mode') {
+                // Handle radio buttons for processing mode
+                const radioButton = document.querySelector(`input[name="processing_mode"][value="${fullConfig[key]}"]`);
+                if (radioButton) {
+                    radioButton.checked = true;
+                }
+            } else {
+                const element = document.querySelector(`[name="${key}"]`);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = fullConfig[key];
+                    } else {
+                        element.value = fullConfig[key];
+                        if (element.type === 'range') {
+                            this.updateRangeValue(element);
+                        }
                     }
                 }
             }
@@ -147,6 +155,8 @@ class ConfigManager {
                         config[key] = true; // If in FormData, checkbox is checked
                     } else if (element.type === 'number' || element.type === 'range') {
                         config[key] = parseFloat(value);
+                    } else if (element.type === 'radio') {
+                        config[key] = value; // Radio button value
                     } else {
                         config[key] = value;
                     }
@@ -160,6 +170,16 @@ class ConfigManager {
                     config[checkbox.name] = false;
                 }
             });
+            
+            // Ensure processing_mode is included (radio buttons)
+            if (!config.processing_mode) {
+                const checkedRadio = document.querySelector('input[name="processing_mode"]:checked');
+                if (checkedRadio) {
+                    config.processing_mode = checkedRadio.value;
+                } else {
+                    config.processing_mode = 'auto'; // Default fallback
+                }
+            }
             
             const response = await fetch(`${this.apiUrl}/api/config`, {
                 method: 'POST',

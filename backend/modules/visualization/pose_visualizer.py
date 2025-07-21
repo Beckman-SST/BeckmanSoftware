@@ -281,7 +281,7 @@ class PoseVisualizer:
     
     def draw_angle(self, frame, angle, position, label=None, color=None, font_scale=0.7, thickness=2):
         """
-        Desenha um ângulo no frame.
+        Desenha um ângulo no frame com sistema avançado de anticolisão.
         
         Args:
             frame (numpy.ndarray): Frame onde o ângulo será desenhado
@@ -301,7 +301,7 @@ class PoseVisualizer:
         if color is None:
             color = angle_color
         
-        # Formata o texto do ângulo
+        # Formata o texto do ângulo (sem símbolo de grau)
         try:
             # Verifica se o ângulo é um número válido
             if isinstance(angle, (tuple, list)):
@@ -310,51 +310,75 @@ class PoseVisualizer:
             
             angle_value = float(angle)
             if label:
-                text = f"{label}: {angle_value:.2f} graus"
+                text = f"{label}: {angle_value:.1f}"
             else:
-                text = f"{angle_value:.2f} graus"
+                text = f"{angle_value:.1f}"
         except (ValueError, TypeError) as e:
             print(f"Erro ao formatar ângulo {angle}: {e}")
             return frame
         
-        # Desloca a posição do texto para a direita do ponto da articulação para evitar sobreposição
-        offset_x = 20  # Deslocamento horizontal em pixels
-        position = (position[0] + offset_x, position[1])
+        # Offset inicial maior para melhor separação da articulação
+        offset_x = 35  # Aumentado de 20 para 35 pixels
+        offset_y = -10  # Pequeno offset vertical para cima
+        initial_position = (position[0] + offset_x, position[1] + offset_y)
         
-        # Ajusta a posição do texto para garantir que ele fique dentro dos limites do frame
-        position = adjust_text_position(
-            frame, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness
+        # Ajusta a posição do texto usando o sistema avançado de anticolisão
+        adjusted_position = adjust_text_position(
+            frame, text, initial_position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness
         )
         
-        # Obtém o tamanho do texto para criar o retângulo de fundo
+        # Obtém o tamanho do texto para calcular posição do símbolo de grau
         text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
         text_w, text_h = text_size
         
+        # Padding aumentado para o fundo do texto (incluindo espaço para o símbolo)
+        bg_padding = 8  # Aumentado de 5 para 8 pixels
+        symbol_space = 12  # Espaço extra para o símbolo de grau
+        
         # Adiciona um fundo semi-transparente para destacar o texto
         # Coordenadas do retângulo (x1, y1) é o canto superior esquerdo e (x2, y2) é o canto inferior direito
-        x1 = position[0] - 5  # 5 pixels de margem à esquerda
-        y1 = position[1] - text_h - 5  # 5 pixels de margem acima
-        x2 = position[0] + text_w + 5  # 5 pixels de margem à direita
-        y2 = position[1] + 5  # 5 pixels de margem abaixo
+        x1 = adjusted_position[0] - bg_padding
+        y1 = adjusted_position[1] - text_h - bg_padding
+        x2 = adjusted_position[0] + text_w + symbol_space + bg_padding
+        y2 = adjusted_position[1] + bg_padding
+        
+        # Garante que o retângulo de fundo fique dentro dos limites do frame
+        x1 = max(0, x1)
+        y1 = max(0, y1)
+        x2 = min(frame.shape[1], x2)
+        y2 = min(frame.shape[0], y2)
         
         # Cria uma cópia do frame para aplicar o retângulo semi-transparente
         overlay = frame.copy()
         cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 0), -1)  # Retângulo preto preenchido
         
-        # Aplica o retângulo com transparência
-        alpha = 0.6  # Nível de transparência (0 = transparente, 1 = opaco)
+        # Aplica o retângulo com transparência ligeiramente aumentada
+        alpha = 0.7  # Aumentado de 0.6 para 0.7 para melhor contraste
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+        
+        # Desenha uma linha sutil conectando a articulação ao texto (opcional)
+        # Isso ajuda a identificar visualmente qual ângulo pertence a qual articulação
+        line_color = tuple(int(c * 0.7) for c in color)  # Cor mais escura que o texto
+        cv2.line(frame, position, adjusted_position, line_color, 1)
         
         # Desenha o texto sobre o retângulo
         cv2.putText(
             frame,
             text,
-            position,
+            adjusted_position,
             cv2.FONT_HERSHEY_SIMPLEX,
             font_scale,
             color,
             thickness
         )
+        
+        # Desenha o símbolo de grau manualmente (pequeno círculo)
+        symbol_x = adjusted_position[0] + text_w + 3  # 3 pixels de espaço após o texto
+        symbol_y = adjusted_position[1] - int(text_h * 0.7)  # Posição superior
+        symbol_radius = max(2, int(font_scale * 4))  # Raio proporcional à fonte
+        
+        # Desenha o círculo do símbolo de grau
+        cv2.circle(frame, (symbol_x, symbol_y), symbol_radius, color, thickness//2 or 1)
         
         return frame
     

@@ -120,16 +120,45 @@ class ImageProcessor:
         landmarks = self.pose_detector.get_all_landmarks(results, width, height)
         
         # Determina qual lado do corpo está mais visível
-        more_visible_side = self.pose_detector.determine_more_visible_side(landmarks)
+        more_visible_side = self.pose_detector.determine_more_visible_side(landmarks, results)
         
-        # Verifica se deve processar a parte inferior do corpo
-        is_lower_body = self.pose_detector.should_process_lower_body(landmarks, results) if self.config.get('process_lower_body', True) else False
+        # Verifica se deve processar a parte inferior do corpo baseado no novo sistema
+        processing_mode = self.config.get('processing_mode', 'auto')
+        
+        if processing_mode == 'upper_only':
+            is_lower_body = False
+        elif processing_mode == 'lower_only':
+            is_lower_body = True
+        else:  # processing_mode == 'auto'
+            is_lower_body = self.pose_detector.should_process_lower_body(landmarks, results)
         
         # Detecta dispositivos eletrônicos independentemente da opção de exibição
         # A detecção é feita sempre, mas o desenho das caixas depende da configuração 'show_electronics'
         electronics_detections = []
         if not is_lower_body or self.config.get('show_upper_body', True):
-            electronics_detections = self.electronics_detector.detect(frame)
+            # Calcula a posição dos olhos para melhorar a seleção do dispositivo
+            eye_position = None
+            if 2 in landmarks and 5 in landmarks:  # Se ambos os olhos estão visíveis
+                left_eye = landmarks[2]
+                right_eye = landmarks[5]
+                # Usa o centro entre os olhos
+                eye_position = (
+                    (left_eye[0] + right_eye[0]) // 2,
+                    (left_eye[1] + right_eye[1]) // 2
+                )
+            elif 2 in landmarks:  # Apenas olho esquerdo visível
+                eye_position = landmarks[2]
+            elif 5 in landmarks:  # Apenas olho direito visível
+                eye_position = landmarks[5]
+            
+            # Calcula a posição do pulso para proximidade
+            wrist_position = None
+            if more_visible_side == 'right' and 16 in landmarks:
+                wrist_position = landmarks[16]  # Pulso direito
+            elif more_visible_side == 'left' and 15 in landmarks:
+                wrist_position = landmarks[15]  # Pulso esquerdo
+            
+            electronics_detections = self.electronics_detector.detect(frame, wrist_position, is_lower_body, eye_position)
         
         # Cria uma cópia limpa do frame para desenhar
         processed_frame = frame.copy()

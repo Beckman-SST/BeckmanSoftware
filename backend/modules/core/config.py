@@ -13,7 +13,7 @@ DEFAULT_CONFIG = {
     'show_angles': True,
     'show_upper_body': True,
     'show_lower_body': True,
-    'process_lower_body': True,
+    'processing_mode': 'auto',  # 'auto', 'upper_only', 'lower_only'
     'only_face_blur': False,  # Nova opção para processar apenas com tarja facial
     'resize_width': 800
 }

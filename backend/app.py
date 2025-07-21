@@ -64,7 +64,7 @@ default_config = {
     'show_angles': True,
     'show_upper_body': True,
     'show_lower_body': True,
-    'process_lower_body': True,
+    'processing_mode': 'auto',  # 'auto', 'upper_only', 'lower_only'
     'only_face_blur': False,  # Nova opção para processar apenas com tarja facial
     'resize_width': 800
 }
@@ -262,7 +262,7 @@ def save_config():
             'show_angles': bool(data.get('show_angles', False)),
             'show_upper_body': bool(data.get('show_upper_body', False)),
             'show_lower_body': bool(data.get('show_lower_body', False)),
-            'process_lower_body': bool(data.get('process_lower_body', False)),
+            'processing_mode': str(data.get('processing_mode', default_config['processing_mode'])),
             'only_face_blur': bool(data.get('only_face_blur', False)),
             'resize_width': int(data.get('resize_width', default_config['resize_width']))
         }

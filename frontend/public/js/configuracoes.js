@@ -61,12 +61,50 @@ class ConfigManager {
             input.addEventListener('input', (e) => this.updateRangeValue(e.target));
         });
 
+        // Processing mode switches - ensure only one is active
+        const processingModeInputs = ['processing_auto', 'processing_upper', 'processing_lower'];
+        processingModeInputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('change', (e) => this.handleProcessingModeChange(e.target));
+            }
+        });
+
         // Back button
         const backBtn = document.querySelector('.back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
                 window.location.href = 'index.html';
             });
+        }
+    }
+
+    handleProcessingModeChange(changedInput) {
+        const processingModeInputs = ['processing_auto', 'processing_upper', 'processing_lower'];
+        
+        if (changedInput.checked) {
+            // If this input was turned on, turn off all others
+            processingModeInputs.forEach(inputId => {
+                if (inputId !== changedInput.id) {
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                        input.checked = false;
+                    }
+                }
+            });
+        } else {
+            // If this input was turned off, ensure at least one is on (default to auto)
+            const anyChecked = processingModeInputs.some(inputId => {
+                const input = document.getElementById(inputId);
+                return input && input.checked;
+            });
+            
+            if (!anyChecked) {
+                const autoInput = document.getElementById('processing_auto');
+                if (autoInput) {
+                    autoInput.checked = true;
+                }
+            }
         }
     }
 
@@ -117,10 +155,36 @@ class ConfigManager {
         
         Object.keys(fullConfig).forEach(key => {
             if (key === 'processing_mode') {
-                // Handle radio buttons for processing mode
-                const radioButton = document.querySelector(`input[name="processing_mode"][value="${fullConfig[key]}"]`);
-                if (radioButton) {
-                    radioButton.checked = true;
+                // Handle processing mode switches
+                const processingModeInputs = ['processing_auto', 'processing_upper', 'processing_lower'];
+                
+                // First, uncheck all processing mode switches
+                processingModeInputs.forEach(inputId => {
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                        input.checked = false;
+                    }
+                });
+                
+                // Then check the appropriate one based on the config value
+                let targetInputId;
+                switch (fullConfig[key]) {
+                    case 'auto':
+                        targetInputId = 'processing_auto';
+                        break;
+                    case 'upper_only':
+                        targetInputId = 'processing_upper';
+                        break;
+                    case 'lower_only':
+                        targetInputId = 'processing_lower';
+                        break;
+                    default:
+                        targetInputId = 'processing_auto'; // Default fallback
+                }
+                
+                const targetInput = document.getElementById(targetInputId);
+                if (targetInput) {
+                    targetInput.checked = true;
                 }
             } else {
                 const element = document.querySelector(`[name="${key}"]`);
@@ -155,8 +219,6 @@ class ConfigManager {
                         config[key] = true; // If in FormData, checkbox is checked
                     } else if (element.type === 'number' || element.type === 'range') {
                         config[key] = parseFloat(value);
-                    } else if (element.type === 'radio') {
-                        config[key] = value; // Radio button value
                     } else {
                         config[key] = value;
                     }
@@ -171,15 +233,22 @@ class ConfigManager {
                 }
             });
             
-            // Ensure processing_mode is included (radio buttons)
-            if (!config.processing_mode) {
-                const checkedRadio = document.querySelector('input[name="processing_mode"]:checked');
-                if (checkedRadio) {
-                    config.processing_mode = checkedRadio.value;
-                } else {
-                    config.processing_mode = 'auto'; // Default fallback
+            // Handle processing mode switches
+            const processingModeInputs = [
+                { id: 'processing_auto', value: 'auto' },
+                { id: 'processing_upper', value: 'upper_only' },
+                { id: 'processing_lower', value: 'lower_only' }
+            ];
+            
+            let processingMode = 'auto'; // Default
+            for (const mode of processingModeInputs) {
+                const input = document.getElementById(mode.id);
+                if (input && input.checked) {
+                    processingMode = mode.value;
+                    break;
                 }
             }
+            config.processing_mode = processingMode;
             
             const response = await fetch(`${this.apiUrl}/api/config`, {
                 method: 'POST',

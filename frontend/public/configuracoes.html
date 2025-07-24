@@ -85,34 +85,42 @@
             </div>
             <h4>RePosture</h4>
         </div>
-        <ul class="sidebar-menu nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link" href="index.html">
-                    <i class="bi bi-cloud-upload me-2"></i>Upload
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link active" href="#">
-                    <i class="bi bi-gear me-2"></i>Configurações
-                </a>
-            </li>
-        </ul>
+        <nav class="sidebar-menu">
+            <div class="sidebar-section">
+                <h6 class="sidebar-section-title">Imagens</h6>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">
+                            <i class="bi bi-cloud-upload"></i>
+                            Upload
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="colagem.html">
+                            <i class="bi bi-grid-3x3"></i>
+                            Colagem
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="configuracoes.html">
+                            <i class="bi bi-gear"></i>
+                            Configurações
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
     </nav>
 
     <!-- Main Content -->
     <div class="main-wrapper">
         <!-- Top Header -->
-        <header class="top-header d-flex justify-content-between align-items-center">
+        <header class="top-header d-flex justify-content-center align-items-center">
             <div class="d-flex align-items-center">
-                <button class="mobile-menu-btn btn btn-outline-secondary d-md-none" onclick="toggleSidebar()">
+                <button class="mobile-menu-btn btn btn-outline-secondary d-md-none me-2" onclick="toggleSidebar()">
                     <i class="bi bi-list"></i>
                 </button>
                 <h2>Configurações</h2>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-outline-secondary" onclick="window.location.href='index.html'" title="Voltar">
-                    <i class="bi bi-arrow-left me-1"></i>Voltar
-                </button>
             </div>
         </header>
 
@@ -226,12 +234,12 @@
                                                 <input class="form-check-input" type="checkbox" id="show_face_blur" 
                                                        name="show_face_blur" checked>
                                                 <label class="form-check-label" for="show_face_blur">
-                                                    Mostrar Desfoque Facial
-                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Aplica desfoque automático nos rostos detectados para preservar a privacidade dos indivíduos no vídeo processado."></i>
+                                                    Mostrar Tarja
+                                                    <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Aplica tarja automática nos rostos detectados para preservar a privacidade dos indivíduos no vídeo processado."></i>
                                                 </label>
                                             </div>
                                             <div class="form-text">
-                                                Aplica desfoque na região do rosto
+                                                Aplica tarja na região do rosto
                                             </div>
                                         </div>
                                         
@@ -297,9 +305,9 @@
                                                 <i class="bi bi-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="Define como o sistema deve processar a análise postural: automaticamente baseado na imagem, forçar apenas parte superior, ou forçar apenas parte inferior."></i>
                                             </label>
                                             <div class="mt-2">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="processing_mode" 
-                                                           id="processing_auto" value="auto" checked>
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="processing_auto" 
+                                                           name="processing_auto" checked>
                                                     <label class="form-check-label" for="processing_auto">
                                                         <strong>Processar Automaticamente</strong>
                                                         <div class="form-text small">
@@ -307,9 +315,9 @@
                                                         </div>
                                                     </label>
                                                 </div>
-                                                <div class="form-check mt-2">
-                                                    <input class="form-check-input" type="radio" name="processing_mode" 
-                                                           id="processing_upper" value="upper_only">
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="processing_upper" 
+                                                           name="processing_upper">
                                                     <label class="form-check-label" for="processing_upper">
                                                         <strong>Processar Somente Parte Superior</strong>
                                                         <div class="form-text small">
@@ -317,9 +325,9 @@
                                                         </div>
                                                     </label>
                                                 </div>
-                                                <div class="form-check mt-2">
-                                                    <input class="form-check-input" type="radio" name="processing_mode" 
-                                                           id="processing_lower" value="lower_only">
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="processing_lower" 
+                                                           name="processing_lower">
                                                     <label class="form-check-label" for="processing_lower">
                                                         <strong>Processar Somente Parte Inferior</strong>
                                                         <div class="form-text small">
@@ -334,13 +342,13 @@
                             </div>
                             
                             <div class="config-actions mt-4 d-flex gap-2">
-                                <button type="button" id="btn-reset-config" class="btn btn-outline-secondary">
+                                <button type="button" id="btn-reset-config" class="btn btn-outline-warning">
                                     <i class="bi bi-arrow-clockwise me-1"></i>Restaurar Padrões
                                 </button>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="bi bi-check-circle me-1"></i>Salvar Configurações
                                 </button>
-                                <button type="button" id="btn-load-config" class="btn btn-outline-info">
+                                <button type="button" id="btn-load-config" class="btn btn-primary">
                                     <i class="bi bi-download me-1"></i>Carregar Configurações
                                 </button>
                             </div>

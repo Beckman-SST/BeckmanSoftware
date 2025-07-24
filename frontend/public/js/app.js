@@ -517,6 +517,9 @@ class RePostureApp {
                     <button class="btn btn-sm btn-outline-success" onclick="app.downloadFile('${file.url}', '${this.escapeHtml(file.name)}')" title="Baixar arquivo">
                         <i class="bi bi-download"></i>
                     </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="app.showDeleteFileModal('${this.escapeHtml(file.name)}')" title="Deletar arquivo">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             </div>
         `;
@@ -556,13 +559,13 @@ class RePostureApp {
     // Utility methods
     async openOutputFolder() {
         try {
-            const response = await fetch('/api/open-folder', { method: 'POST' });
+            const response = await fetch('/api/open-output-folder', { method: 'POST' });
             const result = await response.json();
 
             if (result.success) {
-                this.showMessage('Pasta aberta com sucesso!', 'success');
+                this.showMessage('Pasta output aberta com sucesso!', 'success');
             } else {
-                this.showMessage(result.message || 'Erro ao abrir pasta', 'error');
+                this.showMessage(result.message || 'Erro ao abrir pasta output', 'error');
             }
         } catch (error) {
             this.showMessage('Erro na comunicação com o servidor', 'error');
@@ -570,13 +573,31 @@ class RePostureApp {
     }
 
     async clearTempFiles() {
-        if (!confirm('Tem certeza que deseja limpar todos os arquivos temporários?')) {
-            return;
-        }
+        // Show modern confirmation modal instead of browser default
+        this.showClearFilesModal();
+    }
 
+    showClearFilesModal() {
+        const modal = document.getElementById('clearFilesModal');
+        if (modal) {
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+        }
+    }
+
+    async confirmClearFiles() {
         try {
             const response = await fetch('/api/cleanup', { method: 'POST' });
             const result = await response.json();
+
+            // Hide the modal
+            const modal = document.getElementById('clearFilesModal');
+            if (modal) {
+                const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                if (bootstrapModal) {
+                    bootstrapModal.hide();
+                }
+            }
 
             if (result.success) {
                 this.showMessage(`${result.removed_count} arquivos removidos com sucesso!`, 'success');
@@ -586,6 +607,58 @@ class RePostureApp {
             }
         } catch (error) {
             this.showMessage('Erro na comunicação com o servidor', 'error');
+        }
+    }
+
+    showDeleteFileModal(filename) {
+        // Store the filename for later use
+        this.fileToDelete = filename;
+        
+        // Update modal content with filename
+        const modalBody = document.querySelector('#deleteFileModal .modal-body p');
+        if (modalBody) {
+            modalBody.innerHTML = `Tem certeza que deseja deletar o arquivo <strong>${this.escapeHtml(filename)}</strong>?<br><small class="text-warning">Esta ação não pode ser desfeita.</small>`;
+        }
+        
+        const modal = document.getElementById('deleteFileModal');
+        if (modal) {
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+        }
+    }
+
+    async confirmDeleteFile() {
+        if (!this.fileToDelete) return;
+
+        try {
+            const response = await fetch('/api/delete-file', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ filename: this.fileToDelete })
+            });
+            const result = await response.json();
+
+            // Hide the modal
+            const modal = document.getElementById('deleteFileModal');
+            if (modal) {
+                const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                if (bootstrapModal) {
+                    bootstrapModal.hide();
+                }
+            }
+
+            if (result.success) {
+                this.showMessage(`Arquivo "${this.fileToDelete}" deletado com sucesso!`, 'success');
+                await this.loadProcessedFiles();
+            } else {
+                this.showMessage(result.message || 'Erro ao deletar arquivo', 'error');
+            }
+        } catch (error) {
+            this.showMessage('Erro na comunicação com o servidor', 'error');
+        } finally {
+            this.fileToDelete = null;
         }
     }
 

@@ -580,3 +580,127 @@
         border: 1px solid #ddd;
     }
 }
+
+/* Hierarchical Sidebar Styles */
+.sidebar-section {
+    margin-bottom: 10px;
+}
+
+.sidebar-section-title {
+    color: rgba(255,255,255,0.9);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 25px 5px;
+    margin: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-section .nav-item {
+    margin: 2px 0;
+}
+
+.sidebar-section .nav-link {
+    color: rgba(255,255,255,0.7);
+    padding: 10px 35px;
+    font-size: 0.875rem;
+    border-radius: 0;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+    position: relative;
+}
+
+.sidebar-section .nav-link:hover,
+.sidebar-section .nav-link.active {
+    color: white;
+    background-color: rgba(255,255,255,0.1);
+    border-left-color: #fff;
+    padding-left: 40px;
+}
+
+.sidebar-section .nav-link i {
+    width: 16px;
+    margin-right: 8px;
+    font-size: 0.875rem;
+}
+
+/* Responsive adjustments for hierarchical sidebar */
+@media (max-width: 768px) {
+    .sidebar-section-title {
+        padding: 8px 20px 4px;
+        font-size: 0.8rem;
+    }
+    
+    .sidebar-section .nav-link {
+        padding: 8px 30px;
+        font-size: 0.85rem;
+    }
+    
+    .sidebar-section .nav-link:hover,
+    .sidebar-section .nav-link.active {
+        padding-left: 35px;
+    }
+}
+
+/* Hierarchical Sidebar Styles */
+.sidebar-section {
+    margin-bottom: 10px;
+}
+
+.sidebar-section-title {
+    color: rgba(255,255,255,0.9);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px 25px 5px;
+    margin: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-section .nav-item {
+    margin: 2px 0;
+}
+
+.sidebar-section .nav-link {
+    color: rgba(255,255,255,0.7);
+    padding: 10px 35px;
+    font-size: 0.875rem;
+    border-radius: 0;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+    position: relative;
+}
+
+.sidebar-section .nav-link:hover,
+.sidebar-section .nav-link.active {
+    color: white;
+    background-color: rgba(255,255,255,0.1);
+    border-left-color: #fff;
+    padding-left: 40px;
+}
+
+.sidebar-section .nav-link i {
+    width: 16px;
+    margin-right: 8px;
+    font-size: 0.875rem;
+}
+
+/* Responsive adjustments for hierarchical sidebar */
+@media (max-width: 768px) {
+    .sidebar-section-title {
+        padding: 8px 20px 4px;
+        font-size: 0.8rem;
+    }
+    
+    .sidebar-section .nav-link {
+        padding: 8px 30px;
+        font-size: 0.85rem;
+    }
+    
+    .sidebar-section .nav-link:hover,
+    .sidebar-section .nav-link.active {
+        padding-left: 35px;
+    }
+}

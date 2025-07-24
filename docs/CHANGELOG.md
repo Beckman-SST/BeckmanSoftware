@@ -14,8 +14,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Documentação de critérios
   - Guias de uso e manutenção
   - Documentação da API
+- **Botões de Exclusão Individual**: Adicionado botão de lixo em cada card de arquivo processado para permitir exclusão individual de arquivos da pasta output
+- **Modal de Confirmação de Exclusão**: Criado modal moderno para confirmação de exclusão de arquivos individuais com design consistente
 
 ### Alterado
+- **Interface de Configurações**: Alterado o nome da opção "Mostrar Desfoque Facial" para "Mostrar Tarja" no arquivo `configuracoes.html`
+- **Interface de Configurações**: Convertidos os botões de rádio do "Modo de Processamento" para switches (checkboxes) seguindo o padrão dos controles deslizantes
+- **Interface de Configurações**: Padronizadas as cores dos botões na parte inferior - botões "Salvar" e "Carregar" agora usam a mesma cor primária (azul), e o botão "Restaurar Padrões" usa a cor de aviso (amarelo) igual ao botão "Limpar Marcações" da página de colagem
+- **Botões de Arquivos Processados**: Corrigido o botão "Abrir Pasta" para abrir especificamente a pasta `output` em vez da pasta genérica
+- **Modal de Confirmação**: Substituído o popup padrão do navegador por um modal moderno e elegante para confirmação de limpeza de arquivos processados
+- **JavaScript de Configurações**: Atualizada a lógica no `configuracoes.js` para lidar com os novos switches de modo de processamento, garantindo que apenas um switch possa estar ativo por vez
 - **Otimização da determinação do lado mais visível**: Eliminada a redeterminação local do `more_visible_side` nos visualizadores
   - Modificado `pose_visualizer.py`: Método `draw_landmarks` agora aceita parâmetro `more_visible_side` opcional
   - Modificado `pose_visualizer.py`: Método `_filter_landmarks` agora aceita parâmetro `more_visible_side` opcional

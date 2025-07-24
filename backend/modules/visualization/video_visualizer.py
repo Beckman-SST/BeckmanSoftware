@@ -56,7 +56,7 @@ class VideoVisualizer:
         from ..analysis.angle_analyzer import AngleAnalyzer
         self.angle_analyzer = AngleAnalyzer()
         
-    def draw_video_landmarks(self, frame, results, show_upper_body=True, show_lower_body=True):
+    def draw_video_landmarks(self, frame, results, show_upper_body=True, show_lower_body=True, more_visible_side=None):
         """
         Desenha landmarks de pose especificamente para vídeos usando a lógica original.
         
@@ -65,6 +65,7 @@ class VideoVisualizer:
             results: Resultados do MediaPipe
             show_upper_body (bool): Se True, desenha landmarks do corpo superior
             show_lower_body (bool): Se True, desenha landmarks do corpo inferior
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, será determinado localmente.
             
         Returns:
             numpy.ndarray: Frame com os landmarks desenhados
@@ -180,7 +181,8 @@ class VideoVisualizer:
             # Filtra conexões baseado nas configurações
             connections_to_draw = self._filter_video_connections(
                 show_upper_body, 
-                show_lower_body
+                show_lower_body,
+                more_visible_side
             )
             
             # Desenha as conexões personalizadas
@@ -195,7 +197,8 @@ class VideoVisualizer:
                 frame, 
                 landmarks_dict, 
                 show_upper_body, 
-                show_lower_body
+                show_lower_body,
+                more_visible_side
             )
             
         except Exception as e:
@@ -203,13 +206,14 @@ class VideoVisualizer:
             
         return frame
     
-    def _filter_video_connections(self, show_upper_body, show_lower_body):
+    def _filter_video_connections(self, show_upper_body, show_lower_body, more_visible_side=None):
         """
-        Filtra as conexões baseado nas configurações de exibição.
+        Filtra as conexões baseado nas configurações de exibição e lado mais visível.
         
         Args:
             show_upper_body (bool): Se deve mostrar corpo superior
             show_lower_body (bool): Se deve mostrar corpo inferior
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, mostra ambos os lados.
             
         Returns:
             list: Lista de conexões filtradas
@@ -222,6 +226,19 @@ class VideoVisualizer:
         # IDs dos landmarks do corpo inferior
         lower_body_ids = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
         
+        # IDs específicos para cada lado
+        if more_visible_side:
+            if more_visible_side == 'right':
+                # Lado direito: ombro, cotovelo, pulso direitos
+                visible_side_upper_ids = [12, 14, 16]
+                # Lado direito: quadril, joelho, tornozelo, pé direitos
+                visible_side_lower_ids = [24, 26, 28, 30, 32]
+            else:  # left
+                # Lado esquerdo: ombro, cotovelo, pulso esquerdos
+                visible_side_upper_ids = [11, 13, 15]
+                # Lado esquerdo: quadril, joelho, tornozelo, pé esquerdos
+                visible_side_lower_ids = [23, 25, 27, 29, 31]
+        
         for connection in custom_video_pose_connections:
             start_id, end_id = connection
             
@@ -231,9 +248,21 @@ class VideoVisualizer:
             # Verifica se a conexão pertence ao corpo inferior
             is_lower = (start_id in lower_body_ids or end_id in lower_body_ids)
             
-            # Adiciona a conexão se deve ser mostrada
-            if (show_upper_body and is_upper) or (show_lower_body and is_lower):
-                filtered_connections.append(connection)
+            # Se more_visible_side está definido, filtra por lado
+            if more_visible_side:
+                # Para corpo superior, verifica se a conexão envolve o lado visível
+                if is_upper and show_upper_body:
+                    if (start_id in visible_side_upper_ids or end_id in visible_side_upper_ids):
+                        filtered_connections.append(connection)
+                
+                # Para corpo inferior, verifica se a conexão envolve o lado visível
+                elif is_lower and show_lower_body:
+                    if (start_id in visible_side_lower_ids or end_id in visible_side_lower_ids):
+                        filtered_connections.append(connection)
+            else:
+                # Sem filtragem por lado, usa a lógica original
+                if (show_upper_body and is_upper) or (show_lower_body and is_lower):
+                    filtered_connections.append(connection)
         
         return filtered_connections
     
@@ -261,15 +290,16 @@ class VideoVisualizer:
                     thickness=4
                 )
     
-    def _draw_video_landmarks_points(self, frame, landmarks_dict, show_upper_body, show_lower_body):
+    def _draw_video_landmarks_points(self, frame, landmarks_dict, show_upper_body, show_lower_body, more_visible_side=None):
         """
-        Desenha os pontos dos landmarks.
+        Desenha os pontos dos landmarks baseado nas configurações de exibição e lado mais visível.
         
         Args:
             frame (numpy.ndarray): Frame onde desenhar
             landmarks_dict (dict): Dicionário com coordenadas dos landmarks
             show_upper_body (bool): Se deve mostrar corpo superior
             show_lower_body (bool): Se deve mostrar corpo inferior
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, mostra ambos os lados.
         """
         # IDs dos landmarks do corpo superior
         upper_body_ids = [11, 12, 13, 14, 15, 16]
@@ -277,14 +307,40 @@ class VideoVisualizer:
         # IDs dos landmarks do corpo inferior
         lower_body_ids = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
         
+        # IDs específicos para cada lado
+        if more_visible_side:
+            if more_visible_side == 'right':
+                # Lado direito: ombro, cotovelo, pulso direitos
+                visible_side_upper_ids = [12, 14, 16]
+                # Lado direito: quadril, joelho, tornozelo, pé direitos
+                visible_side_lower_ids = [24, 26, 28, 30, 32]
+            else:  # left
+                # Lado esquerdo: ombro, cotovelo, pulso esquerdos
+                visible_side_upper_ids = [11, 13, 15]
+                # Lado esquerdo: quadril, joelho, tornozelo, pé esquerdos
+                visible_side_lower_ids = [23, 25, 27, 29, 31]
+        
         for landmark_id, (x, y) in landmarks_dict.items():
             # Verifica se deve desenhar este landmark
             should_draw = False
             
-            if show_upper_body and landmark_id in upper_body_ids:
-                should_draw = True
-            elif show_lower_body and landmark_id in lower_body_ids:
-                should_draw = True
+            # Se more_visible_side está definido, filtra por lado
+            if more_visible_side:
+                # Para corpo superior, verifica se o landmark é do lado visível
+                if show_upper_body and landmark_id in upper_body_ids:
+                    if landmark_id in visible_side_upper_ids:
+                        should_draw = True
+                
+                # Para corpo inferior, verifica se o landmark é do lado visível
+                elif show_lower_body and landmark_id in lower_body_ids:
+                    if landmark_id in visible_side_lower_ids:
+                        should_draw = True
+            else:
+                # Sem filtragem por lado, usa a lógica original
+                if show_upper_body and landmark_id in upper_body_ids:
+                    should_draw = True
+                elif show_lower_body and landmark_id in lower_body_ids:
+                    should_draw = True
             
             if should_draw:
                 cv2.circle(

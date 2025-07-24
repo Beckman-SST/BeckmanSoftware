@@ -40,7 +40,7 @@ class PoseVisualizer:
         """
         self.face_padding = face_padding
     
-    def draw_landmarks(self, frame, results, show_face=True, show_upper_body=True, show_lower_body=True):
+    def draw_landmarks(self, frame, results, show_face=True, show_upper_body=True, show_lower_body=True, more_visible_side=None):
         """
         Desenha os landmarks de pose no frame.
         
@@ -50,6 +50,7 @@ class PoseVisualizer:
             show_face (bool): Se True, desenha os landmarks do rosto
             show_upper_body (bool): Se True, desenha os landmarks do corpo superior
             show_lower_body (bool): Se True, desenha os landmarks do corpo inferior
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, será determinado localmente.
             
         Returns:
             numpy.ndarray: Frame com os landmarks desenhados
@@ -70,7 +71,8 @@ class PoseVisualizer:
             modified_landmarks = self._filter_landmarks(
                 results.pose_landmarks,
                 show_upper_body,
-                show_lower_body
+                show_lower_body,
+                more_visible_side
             )
             
             # Converte os landmarks para o formato de dicionário
@@ -122,7 +124,7 @@ class PoseVisualizer:
         
         return frame
     
-    def _filter_landmarks(self, landmarks, show_upper_body, show_lower_body):
+    def _filter_landmarks(self, landmarks, show_upper_body, show_lower_body, more_visible_side=None):
         """
         Filtra os landmarks com base nas opções de visualização.
         
@@ -130,6 +132,7 @@ class PoseVisualizer:
             landmarks: Landmarks do MediaPipe
             show_upper_body (bool): Se True, mostra os landmarks do corpo superior
             show_lower_body (bool): Se True, mostra os landmarks do corpo inferior
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, será determinado localmente.
             
         Returns:
             Landmarks filtrados
@@ -147,39 +150,49 @@ class PoseVisualizer:
         right_lower_body_ids = [24, 26, 28, 32]  # Quadril, joelho, tornozelo e foot index direito
         left_lower_body_ids = [23, 25, 27, 31]   # Quadril, joelho, tornozelo e foot index esquerdo
         
-        # Determina qual lado é mais visível para o corpo superior
-        right_upper_visibility = 0
-        left_upper_visibility = 0
-        
-        if show_upper_body:
-            # Calcula a visibilidade média dos landmarks do lado direito
-            for i in right_upper_body_ids:
-                if i < len(modified_landmarks.landmark):
-                    right_upper_visibility += modified_landmarks.landmark[i].visibility
-            right_upper_visibility /= len(right_upper_body_ids)
+        # Usa o lado mais visível fornecido ou determina localmente se não fornecido
+        if more_visible_side is not None:
+            # Usa o lado mais visível já determinado globalmente
+            more_visible_side_upper = more_visible_side
+            more_visible_side_lower = more_visible_side
+        else:
+            # Determina qual lado é mais visível para o corpo superior (fallback)
+            right_upper_visibility = 0
+            left_upper_visibility = 0
             
-            # Calcula a visibilidade média dos landmarks do lado esquerdo
-            for i in left_upper_body_ids:
-                if i < len(modified_landmarks.landmark):
-                    left_upper_visibility += modified_landmarks.landmark[i].visibility
-            left_upper_visibility /= len(left_upper_body_ids)
-        
-        # Determina qual lado é mais visível para o corpo inferior
-        right_lower_visibility = 0
-        left_lower_visibility = 0
-        
-        if show_lower_body:
-            # Calcula a visibilidade média dos landmarks do lado direito
-            for i in right_lower_body_ids:
-                if i < len(modified_landmarks.landmark):
-                    right_lower_visibility += modified_landmarks.landmark[i].visibility
-            right_lower_visibility /= len(right_lower_body_ids)
+            if show_upper_body:
+                # Calcula a visibilidade média dos landmarks do lado direito
+                for i in right_upper_body_ids:
+                    if i < len(modified_landmarks.landmark):
+                        right_upper_visibility += modified_landmarks.landmark[i].visibility
+                right_upper_visibility /= len(right_upper_body_ids)
+                
+                # Calcula a visibilidade média dos landmarks do lado esquerdo
+                for i in left_upper_body_ids:
+                    if i < len(modified_landmarks.landmark):
+                        left_upper_visibility += modified_landmarks.landmark[i].visibility
+                left_upper_visibility /= len(left_upper_body_ids)
             
-            # Calcula a visibilidade média dos landmarks do lado esquerdo
-            for i in left_lower_body_ids:
-                if i < len(modified_landmarks.landmark):
-                    left_lower_visibility += modified_landmarks.landmark[i].visibility
-            left_lower_visibility /= len(left_lower_body_ids)
+            # Determina qual lado é mais visível para o corpo inferior (fallback)
+            right_lower_visibility = 0
+            left_lower_visibility = 0
+            
+            if show_lower_body:
+                # Calcula a visibilidade média dos landmarks do lado direito
+                for i in right_lower_body_ids:
+                    if i < len(modified_landmarks.landmark):
+                        right_lower_visibility += modified_landmarks.landmark[i].visibility
+                right_lower_visibility /= len(right_lower_body_ids)
+                
+                # Calcula a visibilidade média dos landmarks do lado esquerdo
+                for i in left_lower_body_ids:
+                    if i < len(modified_landmarks.landmark):
+                        left_lower_visibility += modified_landmarks.landmark[i].visibility
+                left_lower_visibility /= len(left_lower_body_ids)
+            
+            # Determina qual lado é mais visível no geral (fallback)
+            more_visible_side_upper = "right" if right_upper_visibility > left_upper_visibility else "left"
+            more_visible_side_lower = "right" if right_lower_visibility > left_lower_visibility else "left"
         
         # Determina se a imagem é lateral (corpo superior) ou frontal (corpo inferior)
         # Verifica se os tornozelos e pés estão visíveis
@@ -191,10 +204,6 @@ class PoseVisualizer:
         
         # Lista para armazenar os IDs dos landmarks a serem mantidos
         ids_to_keep = []
-        
-        # Determina qual lado é mais visível no geral
-        more_visible_side_upper = "right" if right_upper_visibility > left_upper_visibility else "left"
-        more_visible_side_lower = "right" if right_lower_visibility > left_lower_visibility else "left"
         
         # Adiciona apenas o olho do lado mais visível
         if show_upper_body:

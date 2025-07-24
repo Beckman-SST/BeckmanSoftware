@@ -318,41 +318,15 @@ class ImageProcessor:
         # Define os índices dos landmarks inferiores que devem ser ocultados no processamento lateral
         lower_body_indices = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32]  # Quadris, joelhos, tornozelos, pés
         
-        # Função para calcular visibilidade baseada no processamentoTXT.txt
-        def calculate_visibility(landmarks_data, indices):
-            MIN_DETECTION_CONFIDENCE = self.config.get('min_detection_confidence', 0.8)
-            visibility_sum = 0
-            valid_count = 0
-            for idx in indices:
-                if idx in landmarks_data and hasattr(results.pose_landmarks.landmark[idx], 'visibility'):
-                    if results.pose_landmarks.landmark[idx].visibility:  # Verifica se o landmark tem um valor de visibilidade
-                        visibility_sum += results.pose_landmarks.landmark[idx].visibility  # Soma o valor de visibilidade
-                        valid_count += 1  # Conta quantos landmarks foram considerados válidos
-            
-            # Retorna 0 se não houver landmarks válidos no conjunto
-            if valid_count == 0:
-                return 0
-                
-            # Calcula a média de visibilidade
-            avg_visibility = visibility_sum / valid_count
-            
-            # Aplica um limiar mínimo de confiança
-            # O landmark só é considerado "visível" se sua média de visibilidade for maior que MIN_DETECTION_CONFIDENCE
-            return avg_visibility if avg_visibility > MIN_DETECTION_CONFIDENCE else 0
+        # Usa o lado mais visível já determinado pelo pose_detector (corrige inconsistência)
+        side = more_visible_side
         
-        # Calcula a visibilidade média para cada lado
-        right_visibility = calculate_visibility(landmarks, right_indices)
-        left_visibility = calculate_visibility(landmarks, left_indices)
-        
-        # Compara as visibilidades para decidir qual lado é mais visível
-        if right_visibility > left_visibility:
-            print("Lado direito mais visível. Processando lado direito.")
-            side = "right"
+        if side == "right":
+            print(f"Processando lado direito (determinado globalmente: {more_visible_side}).")
             indices_manter = right_indices
             eye_position = landmarks.get(5)  # Olho direito
         else:
-            print("Lado esquerdo mais visível. Processando lado esquerdo.")
-            side = "left"
+            print(f"Processando lado esquerdo (determinado globalmente: {more_visible_side}).")
             indices_manter = left_indices
             eye_position = landmarks.get(2)  # Olho esquerdo
         
@@ -386,7 +360,7 @@ class ImageProcessor:
                 x2, y2 = x + w, y + h
                 
                 # Usa o lado mais visível para determinar quais vértices da caixa usar
-                # Regra corrigida baseada no processamentoTXT.txt:
+                # Lógica corrigida para vista lateral:
                 # - Lado esquerdo (pessoa virada à esquerda): superior esquerdo e inferior direito
                 # - Lado direito (pessoa virada à direita): superior direito e inferior esquerdo
                 from ..core.utils import prolongar_reta

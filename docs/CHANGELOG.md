@@ -15,6 +15,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Guias de uso e manutenção
   - Documentação da API
 
+### Alterado
+- **Otimização da determinação do lado mais visível**: Eliminada a redeterminação local do `more_visible_side` nos visualizadores
+  - Modificado `pose_visualizer.py`: Método `draw_landmarks` agora aceita parâmetro `more_visible_side` opcional
+  - Modificado `pose_visualizer.py`: Método `_filter_landmarks` agora aceita parâmetro `more_visible_side` opcional
+  - Modificado `video_processor.py`: Adicionada determinação de `more_visible_side` usando `pose_detector.determine_more_visible_side`
+  - Modificado `video_visualizer.py`: Método `draw_video_landmarks` agora aceita parâmetro `more_visible_side` opcional
+  - Modificado `video_visualizer.py`: Implementada filtragem baseada no lado mais visível nos métodos `_filter_video_connections` e `_draw_video_landmarks_points`
+  - Melhoria de performance: Evita recálculo desnecessário do lado mais visível
+  - Melhoria de consistência: Garante que o mesmo lado mais visível seja usado em todo o pipeline de processamento
+
+### Corrigido
+- **Correção da detecção dos ângulos dos olhos**: Corrigida a lógica invertida na determinação dos vértices da caixa do dispositivo eletrônico
+  - Modificado `image_processor.py`: Corrigida a lógica para lado esquerdo usar vértices superior esquerdo e inferior direito
+  - Modificado `image_processor.py`: Corrigida a lógica para lado direito usar vértices superior direito e inferior esquerdo
+  - Correção garante que as retas dos ângulos dos olhos sejam desenhadas nos vértices corretos conforme o lado mais visível detectado
+
 ## [1.0.0] - AAAA-MM-DD
 
 ### Adicionado

@@ -310,6 +310,9 @@ class VideoProcessor:
             # Obtém todos os landmarks para uso posterior
             pose_landmarks = self.pose_detector.get_all_landmarks(results, width, height)
             
+            # Determina qual lado do corpo está mais visível
+            more_visible_side = self.pose_detector.determine_more_visible_side(pose_landmarks, results)
+            
             # Aplica tarja no rosto se habilitado na configuração
             if self.config.get('show_face_blur', True):
                 # Obtém landmarks faciais com múltiplos fallbacks
@@ -328,7 +331,8 @@ class VideoProcessor:
                     frame,
                     results,
                     show_upper_body=self.config.get('show_upper_body', True),
-                    show_lower_body=self.config.get('show_lower_body', True)
+                    show_lower_body=self.config.get('show_lower_body', True),
+                    more_visible_side=more_visible_side
                 )
                 
                 # Calcula e desenha o ângulo do pescoço se a opção estiver habilitada

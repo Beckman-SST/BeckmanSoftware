@@ -8,7 +8,7 @@
     "show_angles": true,
     "show_upper_body": true,
     "show_lower_body": true,
-    "processing_mode": "lower_only",
+    "processing_mode": "auto",
     "only_face_blur": false,
     "resize_width": 800
 }

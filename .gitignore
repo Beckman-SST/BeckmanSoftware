@@ -62,3 +62,4 @@ backend/modules/data/videos/*
 !backend/modules/data/videos/.gitkeep
 !backend/modules/data/videos/__init__.py
 
+backend/config.json

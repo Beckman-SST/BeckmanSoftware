@@ -73,6 +73,46 @@ class VideoVisualizer:
         if not results.pose_landmarks:
             return frame
     
+        try:
+            # Obtém dimensões do frame
+            h, w, _ = frame.shape
+            
+            # Converte landmarks para coordenadas de pixel
+            landmarks_dict = {}
+            for i, landmark in enumerate(results.pose_landmarks.landmark):
+                if landmark.visibility >= 0.3:  # Threshold mais permissivo para mostrar mais landmarks
+                    x = int(landmark.x * w)
+                    y = int(landmark.y * h)
+                    landmarks_dict[i] = (x, y)
+            
+            # Filtra conexões baseado nas configurações
+            connections_to_draw = self._filter_video_connections(
+                show_upper_body, 
+                show_lower_body,
+                more_visible_side
+            )
+            
+            # Desenha as conexões personalizadas
+            self._draw_video_connections(
+                frame, 
+                landmarks_dict, 
+                connections_to_draw
+            )
+            
+            # Desenha os landmarks
+            self._draw_video_landmarks_points(
+                frame, 
+                landmarks_dict, 
+                show_upper_body, 
+                show_lower_body,
+                more_visible_side
+            )
+            
+        except Exception as e:
+            print(f"Erro ao desenhar landmarks do vídeo: {str(e)}")
+            
+        return frame
+    
     def draw_angle_text(self, frame, angle, position, label=None, color=(255, 255, 255), font_scale=0.6, thickness=2):
         """
         Desenha o texto de um ângulo no frame com sistema avançado de anticolisão.
@@ -89,6 +129,11 @@ class VideoVisualizer:
         Returns:
             numpy.ndarray: Frame com o texto do ângulo desenhado
         """
+        # Verificações de segurança
+        if frame is None:
+            print("Erro: Frame é None no draw_angle_text")
+            return frame
+            
         if angle is None:
             return frame
         
@@ -117,9 +162,9 @@ class VideoVisualizer:
         text_size, _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
         text_w, text_h = text_size
         
-        # Padding para o fundo do texto (incluindo espaço para o símbolo)
-        bg_padding = 6
-        symbol_space = 12  # Espaço extra para o símbolo de grau
+        # Padding aumentado para o fundo do texto (incluindo espaço para o símbolo)
+        bg_padding = 8  # Aumentado de 6 para 8 pixels
+        symbol_space = 18  # Espaço extra aumentado para o símbolo de grau maior
         
         # Adiciona um fundo semi-transparente para destacar o texto
         x1 = adjusted_position[0] - bg_padding
@@ -156,59 +201,24 @@ class VideoVisualizer:
             thickness
         )
         
-        # Desenha o símbolo de grau manualmente (pequeno círculo)
-        symbol_x = adjusted_position[0] + text_w + 3  # 3 pixels de espaço após o texto
-        symbol_y = adjusted_position[1] - int(text_h * 0.7)  # Posição superior
-        symbol_radius = max(2, int(font_scale * 3))  # Raio proporcional à fonte
+        # Desenha o símbolo de grau manualmente (círculo maior e mais visível)
+        symbol_x = adjusted_position[0] + text_w + 5  # 5 pixels de espaço após o texto (aumentado)
+        symbol_y = adjusted_position[1] - int(text_h * 0.65)  # Posição superior ajustada
+        symbol_radius = max(4, int(font_scale * 6))  # Raio maior e mais proporcional à fonte
         
-        # Desenha o círculo do símbolo de grau
-        cv2.circle(frame, (symbol_x, symbol_y), symbol_radius, color, thickness//2 or 1)
+        # Desenha o círculo do símbolo de grau com espessura maior
+        cv2.circle(frame, (symbol_x, symbol_y), symbol_radius, color, max(2, thickness//2))
         
-        return frame
-            
-        try:
-            # Obtém dimensões do frame
-            h, w, _ = frame.shape
-            
-            # Converte landmarks para coordenadas de pixel
-            landmarks_dict = {}
-            for i, landmark in enumerate(results.pose_landmarks.landmark):
-                if landmark.visibility >= 0.5:  # Só considera landmarks visíveis
-                    x = int(landmark.x * w)
-                    y = int(landmark.y * h)
-                    landmarks_dict[i] = (x, y)
-            
-            # Filtra conexões baseado nas configurações
-            connections_to_draw = self._filter_video_connections(
-                show_upper_body, 
-                show_lower_body,
-                more_visible_side
-            )
-            
-            # Desenha as conexões personalizadas
-            self._draw_video_connections(
-                frame, 
-                landmarks_dict, 
-                connections_to_draw
-            )
-            
-            # Desenha os landmarks
-            self._draw_video_landmarks_points(
-                frame, 
-                landmarks_dict, 
-                show_upper_body, 
-                show_lower_body,
-                more_visible_side
-            )
-            
-        except Exception as e:
-            print(f"Erro ao desenhar landmarks do vídeo: {str(e)}")
-            
+        # Adiciona um círculo interno menor para criar um efeito de anel mais visível
+        inner_radius = max(2, symbol_radius - 1)
+        cv2.circle(frame, (symbol_x, symbol_y), inner_radius, (0, 0, 0), 1)
+        
         return frame
     
     def _filter_video_connections(self, show_upper_body, show_lower_body, more_visible_side=None):
         """
         Filtra as conexões baseado nas configurações de exibição e lado mais visível.
+        Agora usa um threshold de visibilidade mais flexível em vez de ocultar completamente um lado.
         
         Args:
             show_upper_body (bool): Se deve mostrar corpo superior
@@ -226,19 +236,8 @@ class VideoVisualizer:
         # IDs dos landmarks do corpo inferior
         lower_body_ids = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
         
-        # IDs específicos para cada lado
-        if more_visible_side:
-            if more_visible_side == 'right':
-                # Lado direito: ombro, cotovelo, pulso direitos
-                visible_side_upper_ids = [12, 14, 16]
-                # Lado direito: quadril, joelho, tornozelo, pé direitos
-                visible_side_lower_ids = [24, 26, 28, 30, 32]
-            else:  # left
-                # Lado esquerdo: ombro, cotovelo, pulso esquerdos
-                visible_side_upper_ids = [11, 13, 15]
-                # Lado esquerdo: quadril, joelho, tornozelo, pé esquerdos
-                visible_side_lower_ids = [23, 25, 27, 29, 31]
-        
+        # Nova lógica: mostra ambos os lados, mas prioriza o lado mais visível
+        # Só oculta um lado se a diferença de visibilidade for muito grande
         for connection in custom_video_pose_connections:
             start_id, end_id = connection
             
@@ -248,21 +247,9 @@ class VideoVisualizer:
             # Verifica se a conexão pertence ao corpo inferior
             is_lower = (start_id in lower_body_ids or end_id in lower_body_ids)
             
-            # Se more_visible_side está definido, filtra por lado
-            if more_visible_side:
-                # Para corpo superior, verifica se a conexão envolve o lado visível
-                if is_upper and show_upper_body:
-                    if (start_id in visible_side_upper_ids or end_id in visible_side_upper_ids):
-                        filtered_connections.append(connection)
-                
-                # Para corpo inferior, verifica se a conexão envolve o lado visível
-                elif is_lower and show_lower_body:
-                    if (start_id in visible_side_lower_ids or end_id in visible_side_lower_ids):
-                        filtered_connections.append(connection)
-            else:
-                # Sem filtragem por lado, usa a lógica original
-                if (show_upper_body and is_upper) or (show_lower_body and is_lower):
-                    filtered_connections.append(connection)
+            # Lógica mais permissiva: mostra a conexão se ela pertence à parte do corpo habilitada
+            if (show_upper_body and is_upper) or (show_lower_body and is_lower):
+                filtered_connections.append(connection)
         
         return filtered_connections
     
@@ -292,14 +279,15 @@ class VideoVisualizer:
     
     def _draw_video_landmarks_points(self, frame, landmarks_dict, show_upper_body, show_lower_body, more_visible_side=None):
         """
-        Desenha os pontos dos landmarks baseado nas configurações de exibição e lado mais visível.
+        Desenha os pontos dos landmarks baseado nas configurações de exibição e threshold de visibilidade.
+        Agora usa um threshold mínimo de visibilidade em vez de ocultar completamente um lado.
         
         Args:
             frame (numpy.ndarray): Frame onde desenhar
             landmarks_dict (dict): Dicionário com coordenadas dos landmarks
             show_upper_body (bool): Se deve mostrar corpo superior
             show_lower_body (bool): Se deve mostrar corpo inferior
-            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, mostra ambos os lados.
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Usado apenas para referência.
         """
         # IDs dos landmarks do corpo superior
         upper_body_ids = [11, 12, 13, 14, 15, 16]
@@ -307,47 +295,41 @@ class VideoVisualizer:
         # IDs dos landmarks do corpo inferior
         lower_body_ids = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
         
-        # IDs específicos para cada lado
-        if more_visible_side:
-            if more_visible_side == 'right':
-                # Lado direito: ombro, cotovelo, pulso direitos
-                visible_side_upper_ids = [12, 14, 16]
-                # Lado direito: quadril, joelho, tornozelo, pé direitos
-                visible_side_lower_ids = [24, 26, 28, 30, 32]
-            else:  # left
-                # Lado esquerdo: ombro, cotovelo, pulso esquerdos
-                visible_side_upper_ids = [11, 13, 15]
-                # Lado esquerdo: quadril, joelho, tornozelo, pé esquerdos
-                visible_side_lower_ids = [23, 25, 27, 29, 31]
-        
+        # Nova lógica: desenha todos os landmarks que passaram pelo filtro de visibilidade inicial
+        # O filtro de visibilidade já foi aplicado na função draw_video_landmarks (visibility >= 0.3)
         for landmark_id, (x, y) in landmarks_dict.items():
-            # Verifica se deve desenhar este landmark
+            # Verifica se deve desenhar este landmark baseado apenas nas configurações de corpo
             should_draw = False
             
-            # Se more_visible_side está definido, filtra por lado
-            if more_visible_side:
-                # Para corpo superior, verifica se o landmark é do lado visível
-                if show_upper_body and landmark_id in upper_body_ids:
-                    if landmark_id in visible_side_upper_ids:
-                        should_draw = True
-                
-                # Para corpo inferior, verifica se o landmark é do lado visível
-                elif show_lower_body and landmark_id in lower_body_ids:
-                    if landmark_id in visible_side_lower_ids:
-                        should_draw = True
-            else:
-                # Sem filtragem por lado, usa a lógica original
-                if show_upper_body and landmark_id in upper_body_ids:
-                    should_draw = True
-                elif show_lower_body and landmark_id in lower_body_ids:
-                    should_draw = True
+            if show_upper_body and landmark_id in upper_body_ids:
+                should_draw = True
+            elif show_lower_body and landmark_id in lower_body_ids:
+                should_draw = True
             
             if should_draw:
+                # Ajusta a cor baseado no lado mais visível (opcional - para dar feedback visual)
+                color = landmark_color
+                if more_visible_side:
+                    # IDs do lado esquerdo
+                    left_side_ids = [11, 13, 15, 23, 25, 27, 29, 31]
+                    # IDs do lado direito  
+                    right_side_ids = [12, 14, 16, 24, 26, 28, 30, 32]
+                    
+                    if more_visible_side == 'left' and landmark_id in left_side_ids:
+                        # Lado mais visível - cor mais intensa
+                        color = (255, 140, 80)  # Laranja mais brilhante
+                    elif more_visible_side == 'right' and landmark_id in right_side_ids:
+                        # Lado mais visível - cor mais intensa
+                        color = (255, 140, 80)  # Laranja mais brilhante
+                    else:
+                        # Lado menos visível - cor mais suave, mas ainda visível
+                        color = (200, 100, 50)  # Laranja mais suave
+                
                 cv2.circle(
                     frame, 
                     (x, y), 
-                    radius=4, 
-                    color=landmark_color, 
+                    radius=6,  # Aumentado de 4 para 6 pixels
+                    color=color, 
                     thickness=-1  # Preenchido
                 )
                 
@@ -365,6 +347,11 @@ class VideoVisualizer:
             numpy.ndarray: Frame com o ângulo da coluna desenhado
             float: Ângulo da coluna calculado ou None se não foi possível calcular
         """
+        # Verificação de segurança
+        if frame is None:
+            print("Erro: Frame é None no draw_spine_angle")
+            return frame, None
+            
         # Verifica se temos landmarks suficientes
         required_landmarks = [11, 12, 23, 24]  # Ombros e quadris
         if not all(lm_id in landmarks_dict for lm_id in required_landmarks):
@@ -427,7 +414,7 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 shoulder_midpoint,
-                radius=5,
+                radius=7,
                 color=spine_color,
                 thickness=-1  # Preenchido
             )
@@ -435,10 +422,19 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 hip_midpoint,
-                radius=5,
+                radius=7,
                 color=spine_color,
                 thickness=-1  # Preenchido
             )
+            
+            # Texto do ângulo removido para vídeos conforme solicitado
+            # self.draw_angle_text(
+            #     frame, 
+            #     spine_angle, 
+            #     shoulder_midpoint, 
+            #     label="Coluna",
+            #     color=(255, 255, 255)
+            # )
             
             if use_vertical_reference:
                 # Linha vertical de referência removida conforme solicitado
@@ -454,7 +450,7 @@ class VideoVisualizer:
     
     def draw_shoulder_angle(self, frame, landmarks_dict, side='right'):
         """
-        Desenha o ângulo do braço superior (ombro) no frame, alterando a cor da linha de acordo com a pontuação.
+        Desenha o ângulo do braço superior (ombro) no frame, alterando a cor da linha de acordo com a avaliação da postura.
         
         Args:
             frame (numpy.ndarray): Frame onde desenhar
@@ -464,48 +460,48 @@ class VideoVisualizer:
         Returns:
             numpy.ndarray: Frame com o ângulo do ombro desenhado
             float: Ângulo do ombro calculado ou None se não foi possível calcular
-            int: Pontuação baseada no ângulo (1-4 pontos) ou None se não foi possível calcular
         """
+        # Verificação de segurança
+        if frame is None:
+            print("Erro: Frame é None no draw_shoulder_angle")
+            return frame, None
+            
         if side == 'right':
             # Ombro e cotovelo direitos
             shoulder_id, elbow_id = 12, 14
-            # Ombro oposto para verificar abdução
-            opposite_shoulder_id = 11
         else:
             # Ombro e cotovelo esquerdos
             shoulder_id, elbow_id = 11, 13
-            # Ombro oposto para verificar abdução
-            opposite_shoulder_id = 12
         
         # Verifica se todos os landmarks necessários estão disponíveis
-        if not all(lm_id in landmarks_dict for lm_id in [shoulder_id, elbow_id, opposite_shoulder_id]):
-            return frame, None, None
+        if not all(lm_id in landmarks_dict for lm_id in [shoulder_id, elbow_id]):
+            return frame, None
         
         try:
-            # Calcula o ângulo do ombro e a pontuação
-            shoulder_angle, score, is_abducted = self.angle_analyzer.calculate_shoulder_angle(
+            # Calcula o ângulo do ombro
+            shoulder_angle = self.angle_analyzer.calculate_shoulder_angle(
                 landmarks_dict, 
                 side=side
             )
             
             if shoulder_angle is None:
-                return frame, None, None
+                return frame, None
             
             # Obtém as coordenadas dos pontos
             shoulder = landmarks_dict[shoulder_id]
             elbow = landmarks_dict[elbow_id]
             
-            # Determina a cor com base na pontuação
-            if score == 1:
-                color = (0, 255, 0)  # Verde (0° a 20°)
-            elif score == 2:
-                color = (0, 255, 255)  # Amarelo (>20° a 45°)
-            elif score == 3:
-                color = (0, 165, 255)  # Laranja (>45° a 90°)
-            else:  # score == 4
-                color = (0, 0, 255)  # Vermelho (>90°)
+            # Determina a cor com base no ângulo (lógica anterior simples)
+            if shoulder_angle <= 20:
+                color = (0, 255, 0)  # Verde (Nível 1)
+            elif shoulder_angle <= 45:
+                color = (0, 255, 255)  # Amarelo (Nível 2)
+            elif shoulder_angle <= 90:
+                color = (0, 165, 255)  # Laranja (Nível 3)
+            else:
+                color = (0, 0, 255)  # Vermelho (Nível 4)
             
-            # Desenha a linha do braço com a cor determinada pela pontuação
+            # Desenha a linha do braço com a cor determinada pela avaliação
             cv2.line(
                 frame,
                 shoulder,
@@ -518,30 +514,37 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 shoulder,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
-            
+
             cv2.circle(
                 frame,
                 elbow,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
             
-            # Linha vertical de referência removida conforme solicitado
+            # Texto do ângulo removido para vídeos conforme solicitado
+            # self.draw_angle_text(
+            #     frame, 
+            #     shoulder_angle, 
+            #     shoulder, 
+            #     label=f"Ombro {side.title()}",
+            #     color=(255, 255, 255)
+            # )
             
-            return frame, shoulder_angle, score
+            return frame, shoulder_angle
             
         except Exception as e:
             print(f"Erro ao desenhar ângulo do ombro: {str(e)}")
-            return frame, None, None
+            return frame, None
     
     def draw_forearm_angle(self, frame, landmarks_dict, side='right'):
         """
-        Desenha o ângulo do antebraço (cotovelo a punho) no frame, alterando a cor da linha de acordo com a pontuação.
+        Desenha o ângulo do antebraço (cotovelo a punho) no frame, alterando a cor da linha de acordo com a avaliação da postura.
         
         Args:
             frame (numpy.ndarray): Frame onde desenhar
@@ -551,8 +554,12 @@ class VideoVisualizer:
         Returns:
             numpy.ndarray: Frame com o ângulo do antebraço desenhado
             float: Ângulo do antebraço calculado ou None se não foi possível calcular
-            int: Pontuação baseada no ângulo (1-2 pontos) ou None se não foi possível calcular
         """
+        # Verificação de segurança
+        if frame is None:
+            print("Erro: Frame é None no draw_forearm_angle")
+            return frame, None
+            
         if side == 'right':
             # Ombro, cotovelo e punho direitos
             shoulder_id, elbow_id, wrist_id = 12, 14, 16
@@ -562,29 +569,31 @@ class VideoVisualizer:
         
         # Verifica se todos os landmarks necessários estão disponíveis
         if not all(lm_id in landmarks_dict for lm_id in [shoulder_id, elbow_id, wrist_id]):
-            return frame, None, None
+            return frame, None
         
         try:
-            # Calcula o ângulo do antebraço e a pontuação
-            forearm_angle, score = self.angle_analyzer.calculate_forearm_angle(
+            # Calcula o ângulo do antebraço
+            forearm_angle = self.angle_analyzer.calculate_forearm_angle(
                 landmarks_dict, 
                 side=side
             )
             
             if forearm_angle is None:
-                return frame, None, None
+                return frame, None
             
             # Obtém as coordenadas dos pontos
             elbow = landmarks_dict[elbow_id]
             wrist = landmarks_dict[wrist_id]
             
-            # Determina a cor com base na pontuação
-            if score == 1:
-                color = (0, 255, 0)  # Verde (60° a 100°)
-            else:  # score == 2
-                color = (0, 255, 255)  # Amarelo (fora da faixa)
+            # Determina a cor com base no ângulo (lógica anterior simples)
+            if forearm_angle <= 60:
+                color = (0, 255, 0)  # Verde (Nível 1)
+            elif forearm_angle <= 100:
+                color = (0, 255, 255)  # Amarelo (Nível 2)
+            else:
+                color = (0, 0, 255)  # Vermelho (Nível 3)
             
-            # Desenha a linha do antebraço com a cor determinada pela pontuação
+            # Desenha a linha do antebraço com a cor determinada pela avaliação
             cv2.line(
                 frame,
                 elbow,
@@ -597,7 +606,7 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 elbow,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
@@ -605,22 +614,29 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 wrist,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
             
-            # Texto com ângulo removido conforme solicitado
+            # Texto do ângulo removido para vídeos conforme solicitado
+            # self.draw_angle_text(
+            #     frame, 
+            #     forearm_angle, 
+            #     elbow, 
+            #     label=f"Antebraço {side.title()}",
+            #     color=(255, 255, 255)
+            # )
             
-            return frame, forearm_angle, score
+            return frame, forearm_angle
             
         except Exception as e:
             print(f"Erro ao desenhar ângulo do antebraço: {str(e)}")
-            return frame, None, None
+            return frame, None
     
     def draw_knee_angle(self, frame, landmarks_dict, side='right'):
         """
-        Desenha o ângulo do joelho no frame, alterando a cor da linha de acordo com a pontuação baseada nos critérios de Suzanne Rodgers.
+        Desenha o ângulo do joelho no frame, alterando a cor da linha de acordo com a avaliação da postura.
         
         Args:
             frame (numpy.ndarray): Frame onde desenhar
@@ -630,8 +646,12 @@ class VideoVisualizer:
         Returns:
             numpy.ndarray: Frame com o ângulo do joelho desenhado
             float: Ângulo do joelho calculado ou None se não foi possível calcular
-            int: Pontuação baseada no ângulo (1-3 pontos) ou None se não foi possível calcular
         """
+        # Verificação de segurança
+        if frame is None:
+            print("Erro: Frame é None no draw_knee_angle")
+            return frame, None
+            
         if side == 'right':
             # Quadril, joelho e tornozelo direitos
             hip_id, knee_id, ankle_id = 24, 26, 28
@@ -641,32 +661,32 @@ class VideoVisualizer:
         
         # Verifica se todos os landmarks necessários estão disponíveis
         if not all(lm_id in landmarks_dict for lm_id in [hip_id, knee_id, ankle_id]):
-            return frame, None, None
+            return frame, None
         
         try:
-            # Calcula o ângulo do joelho e a pontuação
-            knee_angle, score = self.angle_analyzer.calculate_knee_angle(
+            # Calcula o ângulo do joelho
+            knee_angle = self.angle_analyzer.calculate_knee_angle(
                 landmarks_dict, 
                 side=side
             )
             
             if knee_angle is None:
-                return frame, None, None
+                return frame, None
             
             # Obtém as coordenadas dos pontos
             hip = landmarks_dict[hip_id]
             knee = landmarks_dict[knee_id]
             ankle = landmarks_dict[ankle_id]
             
-            # Determina a cor com base na pontuação
-            if score == 1:
-                color = (0, 255, 0)  # Verde (160° a 180°)
-            elif score == 2:
-                color = (0, 255, 255)  # Amarelo (45° a 80° ou outros ângulos)
-            else:  # score == 3
-                color = (0, 0, 255)  # Vermelho (<45°)
+            # Determina a cor com base no ângulo (lógica anterior simples)
+            if knee_angle >= 60:
+                color = (0, 255, 0)  # Verde (Nível 1)
+            elif knee_angle >= 30:
+                color = (0, 255, 255)  # Amarelo (Nível 2)
+            else:
+                color = (0, 0, 255)  # Vermelho (Nível 3)
             
-            # Desenha a linha da coxa com a cor determinada pela pontuação
+            # Desenha a linha da coxa com a cor determinada pela avaliação
             cv2.line(
                 frame,
                 hip,
@@ -675,7 +695,7 @@ class VideoVisualizer:
                 thickness=4
             )
             
-            # Desenha a linha da perna com a cor determinada pela pontuação
+            # Desenha a linha da perna com a cor determinada pela avaliação
             cv2.line(
                 frame,
                 knee,
@@ -688,7 +708,7 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 hip,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
@@ -696,7 +716,7 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 knee,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
@@ -704,16 +724,25 @@ class VideoVisualizer:
             cv2.circle(
                 frame,
                 ankle,
-                radius=5,
+                radius=7,
                 color=color,
                 thickness=-1  # Preenchido
             )
             
-            return frame, knee_angle, score
+            # Texto do ângulo removido para vídeos conforme solicitado
+            # self.draw_angle_text(
+            #     frame, 
+            #     knee_angle, 
+            #     knee, 
+            #     label=f"Joelho {side.title()}",
+            #     color=(255, 255, 255)
+            # )
+            
+            return frame, knee_angle
             
         except Exception as e:
             print(f"Erro ao desenhar ângulo do joelho: {str(e)}")
-            return frame, None, None
+            return frame, None
     
     def apply_face_blur(self, frame, face_landmarks=None, eye_landmarks=None):
         """
@@ -775,6 +804,122 @@ class VideoVisualizer:
         cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0, 0, 0), -1)
         
         return frame
+    
+    def draw_neck_line(self, frame, landmarks_dict, face_landmarks=None, eye_landmarks=None):
+        """
+        Desenha uma linha do ponto médio dos ombros até o centro da tarja facial,
+        colorida com base nos critérios de angulação do pescoço.
+        
+        Args:
+            frame (numpy.ndarray): Frame onde a linha será desenhada
+            landmarks_dict (dict): Dicionário com as coordenadas dos landmarks do corpo
+            face_landmarks (dict): Dicionário com os landmarks do rosto
+            eye_landmarks (dict): Dicionário com os landmarks dos olhos
+            
+        Returns:
+            tuple: (frame modificado, ângulo do pescoço)
+        """
+        try:
+            # IDs dos landmarks dos ombros
+            left_shoulder_id, right_shoulder_id = 11, 12
+            
+            # Verifica se os ombros estão disponíveis
+            if not all(lm_id in landmarks_dict for lm_id in [left_shoulder_id, right_shoulder_id]):
+                return frame, None
+            
+            # Calcula o ponto médio entre os ombros
+            left_shoulder = landmarks_dict[left_shoulder_id]
+            right_shoulder = landmarks_dict[right_shoulder_id]
+            shoulder_midpoint = (
+                (left_shoulder[0] + right_shoulder[0]) // 2,
+                (left_shoulder[1] + right_shoulder[1]) // 2
+            )
+            
+            # Determina o centro da tarja facial
+            face_center = None
+            
+            if face_landmarks:
+                # Calcula centro dos landmarks faciais
+                x_coords = [coord[0] for coord in face_landmarks.values()]
+                y_coords = [coord[1] for coord in face_landmarks.values()]
+                
+                if x_coords and y_coords:
+                    face_center = (
+                        sum(x_coords) // len(x_coords),
+                        sum(y_coords) // len(y_coords)
+                    )
+            elif eye_landmarks:
+                # Usa landmarks dos olhos como fallback
+                left_eye = eye_landmarks.get(2)  # LEFT_EYE
+                right_eye = eye_landmarks.get(5)  # RIGHT_EYE
+                
+                if left_eye and right_eye:
+                    face_center = (
+                        (left_eye[0] + right_eye[0]) // 2,
+                        (left_eye[1] + right_eye[1]) // 2
+                    )
+                elif left_eye:
+                    face_center = left_eye
+                elif right_eye:
+                    face_center = right_eye
+            
+            # Se não conseguiu determinar o centro da face, usa o nariz
+            if not face_center:
+                nose_id = 0
+                if nose_id in landmarks_dict:
+                    face_center = landmarks_dict[nose_id]
+                else:
+                    return frame, None
+            
+            # Calcula o ângulo do pescoço
+            neck_angle = self.angle_analyzer.calculate_neck_angle(
+                landmarks_dict, 
+                face_center=face_center
+            )
+            
+            if neck_angle is None:
+                return frame, None
+            
+            # Determina a cor com base no ângulo do pescoço
+            # Usando critérios similares aos outros ângulos
+            if neck_angle <= 15:  # Posição neutra/boa
+                color = (0, 255, 0)  # Verde (Nível 1)
+            elif neck_angle <= 30:  # Inclinação moderada
+                color = (0, 255, 255)  # Amarelo (Nível 2)
+            else:  # Inclinação excessiva
+                color = (0, 0, 255)  # Vermelho (Nível 3)
+            
+            # Desenha a linha do pescoço
+            cv2.line(
+                frame,
+                shoulder_midpoint,
+                face_center,
+                color,
+                thickness=4
+            )
+            
+            # Desenha círculos nos pontos
+            cv2.circle(
+                frame,
+                shoulder_midpoint,
+                radius=7,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            cv2.circle(
+                frame,
+                face_center,
+                radius=7,
+                color=color,
+                thickness=-1  # Preenchido
+            )
+            
+            return frame, neck_angle
+            
+        except Exception as e:
+            print(f"Erro ao desenhar linha do pescoço: {str(e)}")
+            return frame, None
     
     def _apply_face_tarja_from_eyes(self, frame, eye_landmarks):
         """

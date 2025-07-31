@@ -30,9 +30,10 @@ class VideoProcessor:
         
         # Inicializa detector de pose com landmarks faciais
         self.pose_detector = PoseDetector(
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
-            moving_average_window=3
+            min_detection_confidence=config.get('min_detection_confidence', 0.5),
+            min_tracking_confidence=config.get('min_tracking_confidence', 0.5),
+            moving_average_window=config.get('moving_average_window', 3),
+            config=config  # Passa todas as configurações para o PoseDetector
         )
         
         # Inicializa o analisador de ângulos
@@ -310,8 +311,8 @@ class VideoProcessor:
             # Obtém todos os landmarks para uso posterior
             pose_landmarks = self.pose_detector.get_all_landmarks(results, width, height)
             
-            # Determina qual lado do corpo está mais visível
-            more_visible_side = self.pose_detector.determine_more_visible_side(pose_landmarks, results)
+            # Determina qual lado do corpo está mais visível (sem prints para vídeos)
+            more_visible_side = self.pose_detector.determine_more_visible_side(pose_landmarks, results, verbose=False)
             
             # Aplica tarja no rosto se habilitado na configuração
             if self.config.get('show_face_blur', True):
@@ -337,13 +338,25 @@ class VideoProcessor:
                 
                 # Calcula e desenha o ângulo do pescoço se a opção estiver habilitada
                 if self.config.get('show_angles', True) and self.config.get('show_upper_body', True):
+                    # Desenha a linha do pescoço do ponto médio dos ombros até o centro da tarja facial
+                    neck_landmarks_available = all(lm_id in pose_landmarks for lm_id in [11, 12])
+                    
+                    if neck_landmarks_available:
+                        # Desenha a linha do pescoço
+                        frame, neck_angle = self.video_visualizer.draw_neck_line(
+                            frame,
+                            pose_landmarks,
+                            face_landmarks=face_landmarks.get('face_mesh') if face_landmarks else None,
+                            eye_landmarks=face_landmarks.get('pose_eyes') if face_landmarks else None
+                        )
+                    
                     # Calcula e desenha o ângulo do braço superior (ombro) para ambos os lados
                     # Verifica se temos landmarks suficientes para calcular o ângulo do ombro direito
                     right_shoulder_landmarks_available = all(lm_id in pose_landmarks for lm_id in [12, 14, 11])
                     
                     if right_shoulder_landmarks_available:
                         # Desenha o ângulo do ombro direito
-                        frame, right_shoulder_angle, right_shoulder_score = self.video_visualizer.draw_shoulder_angle(
+                        frame, right_shoulder_angle = self.video_visualizer.draw_shoulder_angle(
                             frame,
                             pose_landmarks,
                             side='right'
@@ -354,7 +367,7 @@ class VideoProcessor:
                     
                     if left_shoulder_landmarks_available:
                         # Desenha o ângulo do ombro esquerdo
-                        frame, left_shoulder_angle, left_shoulder_score = self.video_visualizer.draw_shoulder_angle(
+                        frame, left_shoulder_angle = self.video_visualizer.draw_shoulder_angle(
                             frame,
                             pose_landmarks,
                             side='left'
@@ -365,7 +378,7 @@ class VideoProcessor:
                     
                     if right_forearm_landmarks_available:
                         # Desenha o ângulo do antebraço direito
-                        frame, right_forearm_angle, right_forearm_score = self.video_visualizer.draw_forearm_angle(
+                        frame, right_forearm_angle = self.video_visualizer.draw_forearm_angle(
                             frame,
                             pose_landmarks,
                             side='right'
@@ -376,7 +389,7 @@ class VideoProcessor:
                     
                     if left_forearm_landmarks_available:
                         # Desenha o ângulo do antebraço esquerdo
-                        frame, left_forearm_angle, left_forearm_score = self.video_visualizer.draw_forearm_angle(
+                        frame, left_forearm_angle = self.video_visualizer.draw_forearm_angle(
                             frame,
                             pose_landmarks,
                             side='left'
@@ -414,7 +427,7 @@ class VideoProcessor:
                     
                     if right_knee_landmarks_available:
                         # Desenha o ângulo do joelho direito
-                        frame, right_knee_angle, right_knee_score = self.video_visualizer.draw_knee_angle(
+                        frame, right_knee_angle = self.video_visualizer.draw_knee_angle(
                             frame,
                             pose_landmarks,
                             side='right'
@@ -425,7 +438,7 @@ class VideoProcessor:
                     
                     if left_knee_landmarks_available:
                         # Desenha o ângulo do joelho esquerdo
-                        frame, left_knee_angle, left_knee_score = self.video_visualizer.draw_knee_angle(
+                        frame, left_knee_angle = self.video_visualizer.draw_knee_angle(
                             frame,
                             pose_landmarks,
                             side='left'

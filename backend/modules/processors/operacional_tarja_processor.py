@@ -10,7 +10,8 @@ class OperacionalTarjaProcessor:
         self.pose_detector = PoseDetector(
             min_detection_confidence=config.get('min_detection_confidence', 0.8),
             min_tracking_confidence=config.get('min_tracking_confidence', 0.8),
-            moving_average_window=config.get('moving_average_window', 5)
+            moving_average_window=config.get('moving_average_window', 5),
+            config=config  # Passa todas as configurações para o PoseDetector
         )
         self.visualizer = VideoVisualizer(tarja_ratio=0.14)  # Aumentado para 14% conforme solicitado
 

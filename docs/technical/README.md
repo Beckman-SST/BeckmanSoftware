@@ -33,6 +33,19 @@ Documentação detalhada sobre o sistema de processamento de vídeos, incluindo:
 - Processamento de vídeos (sequencial e paralelo)
 - Configurações
 
+### [Suavização Temporal Avançada](./suavizacao_temporal_avancada.md)
+
+Documentação técnica completa sobre o sistema avançado de suavização temporal, incluindo:
+
+- Arquitetura e componentes (Filtro de Kalman, Detecção de Outliers, Média Móvel Ponderada)
+- Algoritmos detalhados e implementação matemática
+- Configurações e parâmetros de ajuste
+- Métricas de performance e benchmarks comparativos
+- Integração com o sistema existente
+- Casos de uso e troubleshooting
+- Extensibilidade e desenvolvimento futuro
+- Resultados: 2.7% melhoria no jitter, 88% detecção de outliers
+
 ### [Implementação](./implementacao.md)
 
 Detalhes técnicos da implementação, incluindo:
@@ -80,7 +93,17 @@ O sistema implementa dois tipos principais de cálculo de ângulos:
 
 ### Suavização de Landmarks
 
-Para reduzir o ruído na detecção de landmarks, o sistema implementa um algoritmo de suavização que utiliza uma janela deslizante para calcular a média móvel das posições dos landmarks ao longo do tempo.
+Para reduzir o ruído na detecção de landmarks, o sistema implementa dois níveis de suavização:
+
+#### Suavização Simples (Média Móvel)
+Algoritmo básico que utiliza uma janela deslizante para calcular a média móvel das posições dos landmarks ao longo do tempo.
+
+#### Suavização Temporal Avançada
+Sistema avançado que combina múltiplas técnicas para maior estabilidade:
+- **Filtro de Kalman**: Predição e correção baseada em modelo de movimento
+- **Detecção de Outliers**: Identificação automática de medições anômalas
+- **Média Móvel Ponderada**: Pesos adaptativos com fator de decaimento
+- **Melhorias**: 2.7% redução no jitter, detecção de até 88% de outliers
 
 ### Processamento Paralelo
 

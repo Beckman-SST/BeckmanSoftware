@@ -22,7 +22,8 @@ class ImageProcessor:
         self.pose_detector = PoseDetector(
             min_detection_confidence=config.get('min_detection_confidence', 0.8),
             min_tracking_confidence=config.get('min_tracking_confidence', 0.8),
-            moving_average_window=config.get('moving_average_window', 5)
+            moving_average_window=config.get('moving_average_window', 5),
+            config=config  # Passa todas as configurações para o PoseDetector
         )
         
         self.electronics_detector = ElectronicsDetector(
@@ -221,7 +222,7 @@ class ImageProcessor:
                 visible_landmarks.landmark[i].visibility = 0
         
         # Calcula os ângulos do joelho e tornozelo
-        knee_angle, knee_score = self.angle_analyzer.calculate_knee_angle(landmarks, side)
+        knee_angle = self.angle_analyzer.calculate_knee_angle(landmarks, side)
         ankle_angle = self.angle_analyzer.calculate_ankle_angle(landmarks, side)
         
         # Desenha os ângulos se a opção estiver habilitada
@@ -349,6 +350,7 @@ class ImageProcessor:
             # Calcula o ângulo entre os olhos e o dispositivo eletrônico mais próximo
             # Sempre calcula os ângulos dos olhos, independente da configuração SHOW_ELECTRONICS
             eyes_to_device_angle = None
+            eyes_to_device_angle_lines = None
             
             # Calcula e desenha o ângulo dos olhos em relação ao dispositivo eletrônico (novo método)
             # Usa a posição dos olhos já definida anteriormente
@@ -390,17 +392,14 @@ class ImageProcessor:
                 # Calcula o ângulo entre as retas
                 from ..core.utils import calculate_angle
                 try:
-                    eye_angle = calculate_angle(prolonged_top, eye_position, prolonged_bottom)
+                    eye_angle_with_lines = calculate_angle(prolonged_top, eye_position, prolonged_bottom)
                     
-                    # Adiciona o texto do ângulo próximo ao olho se SHOW_ANGLES estiver ativado
+                    # Adiciona o ângulo dos olhos à lista de ângulos para desenhar com o padrão padronizado
                     if self.config.get('show_angles', True):
-                        eye_text = f"{eye_angle:.2f} graus"
-                        text_position = (eye_position[0] + 10, eye_position[1] - 10)  # Posição ligeiramente deslocada do olho
-                        cv2.putText(frame_clean, eye_text, text_position,
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)  # Texto em amarelo/ciano
+                        eyes_to_device_angle_lines = eye_angle_with_lines  # Armazena para usar depois
                 except Exception as e:
                     print(f"Erro ao calcular ângulo dos olhos: {e}")
-                    eye_angle = None
+                    eyes_to_device_angle_lines = None
                 
                 # Obtém o centro do primeiro dispositivo eletrônico detectado para o cálculo do ângulo original
                 device_center = self.electronics_detector.get_detection_center(detection)
@@ -441,6 +440,18 @@ class ImageProcessor:
                     })
                 
                 # A visualização do ângulo do pescoço foi removida
+                
+                # Coleta informações do ângulo entre os olhos e o dispositivo (novo método com retas)
+                if eyes_to_device_angle_lines is not None and electronics_detections:
+                    # Posição para o texto do ângulo próximo ao olho
+                    text_position = (eye_position[0] + 10, eye_position[1] - 10)
+                    
+                    angle_info.append({
+                        'angle': eyes_to_device_angle_lines,
+                        'position': text_position,
+                        'label': "",
+                        'color': (0, 255, 255)  # Amarelo/ciano
+                    })
                 
                 # Coleta informações do ângulo entre os olhos e o dispositivo (método original)
                 if eyes_to_device_angle is not None and not electronics_detections:  # Só desenha se não tiver desenhado com o novo método

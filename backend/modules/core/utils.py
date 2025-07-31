@@ -299,3 +299,74 @@ def apply_moving_average(landmarks_history, current_landmarks, window_size=5):
     # Esta é uma implementação genérica que deve ser adaptada conforme necessário
     
     return smoothed_landmarks
+
+def apply_clahe(image, clip_limit=2.0, tile_grid_size=8):
+    """
+    Aplica CLAHE (Contrast Limited Adaptive Histogram Equalization) para melhorar o contraste da imagem.
+    
+    O CLAHE é uma técnica avançada de equalização de histograma que melhora o contraste local
+    da imagem sem amplificar excessivamente o ruído. É especialmente útil para:
+    - Imagens com iluminação irregular
+    - Condições de baixa luminosidade
+    - Melhorar a detecção de landmarks em poses
+    
+    Args:
+        image (numpy.ndarray): Imagem de entrada (BGR ou RGB)
+        clip_limit (float): Limite de contraste para evitar amplificação excessiva do ruído.
+                           Valores típicos: 1.0-4.0. Maior = mais contraste, mas mais ruído.
+        tile_grid_size (int): Tamanho da grade de tiles para processamento local.
+                             Valores típicos: 4-16. Menor = mais localizado, maior = mais suave.
+    
+    Returns:
+        numpy.ndarray: Imagem com CLAHE aplicado (mesmo formato da entrada)
+    """
+    # Verifica se a imagem é válida
+    if image is None or image.size == 0:
+        return image
+    
+    # Converte para LAB para aplicar CLAHE apenas no canal de luminância
+    # Isso preserva melhor as cores originais
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    
+    # Separa os canais LAB
+    l_channel, a_channel, b_channel = cv2.split(lab)
+    
+    # Cria o objeto CLAHE
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_grid_size, tile_grid_size))
+    
+    # Aplica CLAHE apenas no canal de luminância (L)
+    l_channel_clahe = clahe.apply(l_channel)
+    
+    # Reconstrói a imagem LAB com o canal L melhorado
+    lab_clahe = cv2.merge([l_channel_clahe, a_channel, b_channel])
+    
+    # Converte de volta para BGR
+    image_clahe = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
+    
+    return image_clahe
+
+def apply_image_preprocessing(image, config):
+    """
+    Aplica pré-processamento de imagem baseado nas configurações.
+    
+    Args:
+        image (numpy.ndarray): Imagem de entrada
+        config (dict): Configurações de processamento
+        
+    Returns:
+        numpy.ndarray: Imagem pré-processada
+    """
+    processed_image = image.copy()
+    
+    # Aplica CLAHE se habilitado
+    if config.get('enable_clahe', False):
+        clip_limit = config.get('clahe_clip_limit', 2.0)
+        tile_grid_size = config.get('clahe_tile_grid_size', 8)
+        
+        processed_image = apply_clahe(
+            processed_image, 
+            clip_limit=clip_limit, 
+            tile_grid_size=tile_grid_size
+        )
+    
+    return processed_image

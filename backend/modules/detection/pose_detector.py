@@ -1,10 +1,11 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from ..core.utils import apply_moving_average
+from ..core.utils import apply_moving_average, apply_image_preprocessing
+from ..core.temporal_smoothing import create_advanced_temporal_smoother
 
 class PoseDetector:
-    def __init__(self, min_detection_confidence=0.8, min_tracking_confidence=0.8, moving_average_window=5):
+    def __init__(self, min_detection_confidence=0.8, min_tracking_confidence=0.8, moving_average_window=5, config=None):
         """
         Inicializa o detector de pose usando MediaPipe Holistic.
         
@@ -12,6 +13,7 @@ class PoseDetector:
             min_detection_confidence (float): Confiança mínima para detecção
             min_tracking_confidence (float): Confiança mínima para rastreamento
             moving_average_window (int): Tamanho da janela para média móvel
+            config (dict): Configurações de pré-processamento de imagem e suavização temporal
         """
         self.mp_holistic = mp.solutions.holistic
         self.mp_drawing = mp.solutions.drawing_utils
@@ -25,6 +27,15 @@ class PoseDetector:
         
         self.moving_average_window = moving_average_window
         self.landmarks_history = []
+        
+        # Configurações de pré-processamento
+        self.config = config or {}
+        
+        # Inicializa suavização temporal avançada se habilitada
+        self.advanced_smoother = None
+        if self.config.get('enable_advanced_smoothing', False):
+            self.advanced_smoother = create_advanced_temporal_smoother(self.config)
+            print("Suavização temporal avançada habilitada")
     
     def detect(self, frame):
         """
@@ -36,19 +47,27 @@ class PoseDetector:
         Returns:
             tuple: (frame RGB, resultados do MediaPipe)
         """
+        # Aplica pré-processamento de imagem (incluindo CLAHE se habilitado)
+        preprocessed_frame = apply_image_preprocessing(frame, self.config)
+        
         # Converte o frame para RGB (MediaPipe usa RGB)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_rgb = cv2.cvtColor(preprocessed_frame, cv2.COLOR_BGR2RGB)
         
         # Processa o frame
         results = self.holistic.process(frame_rgb)
         
-        # Aplica média móvel se houver landmarks de pose
+        # Aplica suavização temporal se houver landmarks de pose
         if results.pose_landmarks:
-            results.pose_landmarks = apply_moving_average(
-                self.landmarks_history, 
-                results.pose_landmarks, 
-                self.moving_average_window
-            )
+            if self.advanced_smoother is not None:
+                # Usa suavização temporal avançada
+                results.pose_landmarks = self.advanced_smoother.smooth_landmarks(results.pose_landmarks)
+            else:
+                # Usa média móvel simples como fallback
+                results.pose_landmarks = apply_moving_average(
+                    self.landmarks_history, 
+                    results.pose_landmarks, 
+                    self.moving_average_window
+                )
         
         return frame_rgb, results
     
@@ -75,7 +94,7 @@ class PoseDetector:
         y = int(landmark.y * image_height)
         
         # Verifica se o landmark está visível
-        if landmark.visibility < 0.5:
+        if landmark.visibility < 0.3:  # Threshold mais permissivo
             return None
             
         return (x, y)
@@ -103,38 +122,41 @@ class PoseDetector:
             y = int(landmark.y * image_height)
             
             # Adiciona o landmark ao dicionário se estiver visível
-            if landmark.visibility >= 0.5:
+            if landmark.visibility >= 0.3:  # Threshold mais permissivo
                 landmarks[i] = (x, y)
                 
         return landmarks
     
-    def determine_more_visible_side(self, landmarks, results=None):
+    def determine_more_visible_side(self, landmarks, results=None, verbose=True):
         """
-        Determina qual lado do corpo está mais visível usando múltiplos critérios.
+        Determina qual lado do corpo está mais visível na imagem usando múltiplos critérios.
         
         Args:
             landmarks (dict): Dicionário com as coordenadas dos landmarks
-            results: Resultados originais do MediaPipe (opcional, para usar dados de visibilidade)
+            results: Resultados originais do MediaPipe (opcional)
+            verbose (bool): Se True, imprime informações de debug. False para vídeos.
             
         Returns:
             str: 'left' ou 'right'
         """
-        print("\n=== ANÁLISE DO LADO MAIS VISÍVEL ===")
+        if verbose:
+            print("\n=== ANÁLISE DO LADO MAIS VISÍVEL ===")
         
         # Se temos os resultados do MediaPipe, usa análise avançada com visibilidade
         if results is not None and hasattr(results, 'pose_landmarks') and results.pose_landmarks:
-            return self._enhanced_side_detection(landmarks, results)
+            return self._enhanced_side_detection(landmarks, results, verbose)
         else:
             # Caso contrário, usa análise baseada apenas na presença dos landmarks
-            return self._fallback_side_detection(landmarks)
+            return self._fallback_side_detection(landmarks, verbose)
     
-    def _enhanced_side_detection(self, landmarks, results):
+    def _enhanced_side_detection(self, landmarks, results, verbose=True):
         """
-        Análise avançada do lado mais visível usando dados de visibilidade do MediaPipe.
+        Análise avançada usando dados de visibilidade do MediaPipe.
         
         Args:
             landmarks (dict): Dicionário com as coordenadas dos landmarks
             results: Resultados originais do MediaPipe
+            verbose (bool): Se True, imprime informações de debug
             
         Returns:
             str: 'left' ou 'right'
@@ -149,7 +171,8 @@ class PoseDetector:
         shoulder_score_left = left_shoulder_vis
         shoulder_score_right = right_shoulder_vis
         
-        print(f"Visibilidade dos ombros - Esquerdo: {left_shoulder_vis:.3f}, Direito: {right_shoulder_vis:.3f}")
+        if verbose:
+            print(f"Visibilidade dos ombros - Esquerdo: {left_shoulder_vis:.3f}, Direito: {right_shoulder_vis:.3f}")
         
         # === CRITÉRIO 2: VISIBILIDADE DOS OLHOS E ORELHAS ===
         # Olhos e orelhas ajudam a determinar a orientação da cabeça
@@ -163,8 +186,9 @@ class PoseDetector:
         eye_ear_score_left = (left_eye_vis + left_ear_vis) / 2
         eye_ear_score_right = (right_eye_vis + right_ear_vis) / 2
         
-        print(f"Visibilidade olhos - Esquerdo: {left_eye_vis:.3f}, Direito: {right_eye_vis:.3f}")
-        print(f"Visibilidade orelhas - Esquerda: {left_ear_vis:.3f}, Direita: {right_ear_vis:.3f}")
+        if verbose:
+            print(f"Visibilidade olhos - Esquerdo: {left_eye_vis:.3f}, Direito: {right_eye_vis:.3f}")
+            print(f"Visibilidade orelhas - Esquerda: {left_ear_vis:.3f}, Direita: {right_ear_vis:.3f}")
         
         # === CRITÉRIO 3: ANÁLISE DA PROJEÇÃO DOS ÂNGULOS DOS OLHOS ===
         # Calcula a orientação da cabeça baseada na posição relativa dos olhos
@@ -188,7 +212,8 @@ class PoseDetector:
                 else:  # Inclinado para baixo à esquerda
                     eye_angle_score_left += 0.3
             
-            print(f"Ângulo dos olhos: {eye_angle:.1f}° (>0: direita mais próxima, <0: esquerda mais próxima)")
+            if verbose:
+                print(f"Ângulo dos olhos: {eye_angle:.1f}° (>0: direita mais próxima, <0: esquerda mais próxima)")
         
         # === CRITÉRIO 4: VISIBILIDADE GERAL DOS LANDMARKS DE CADA LADO ===
         # Landmarks do lado esquerdo (do ponto de vista da pessoa)
@@ -225,8 +250,9 @@ class PoseDetector:
         general_score_left = avg_left_visibility + (highly_visible_left * 0.1)
         general_score_right = avg_right_visibility + (highly_visible_right * 0.1)
         
-        print(f"Visibilidade geral - Esquerda: {avg_left_visibility:.3f} ({highly_visible_left} altamente visíveis)")
-        print(f"Visibilidade geral - Direita: {avg_right_visibility:.3f} ({highly_visible_right} altamente visíveis)")
+        if verbose:
+            print(f"Visibilidade geral - Esquerda: {avg_left_visibility:.3f} ({highly_visible_left} altamente visíveis)")
+            print(f"Visibilidade geral - Direita: {avg_right_visibility:.3f} ({highly_visible_right} altamente visíveis)")
         
         # === CRITÉRIO 5: ANÁLISE DE PROFUNDIDADE BASEADA EM COORDENADAS Z ===
         # Landmarks mais próximos da câmera tendem a ter valores Z menores
@@ -244,7 +270,8 @@ class PoseDetector:
             else:
                 depth_score_right += 0.2
             
-            print(f"Profundidade dos ombros - Esquerdo: {left_shoulder_z:.3f}, Direito: {right_shoulder_z:.3f}")
+            if verbose:
+                print(f"Profundidade dos ombros - Esquerdo: {left_shoulder_z:.3f}, Direito: {right_shoulder_z:.3f}")
         
         # === CÁLCULO FINAL DOS SCORES ===
         # Pesos para cada critério
@@ -274,26 +301,29 @@ class PoseDetector:
         more_visible_side = 'left' if final_score_left > final_score_right else 'right'
         confidence = abs(final_score_left - final_score_right)
         
-        print(f"\nScores finais:")
-        print(f"  - Lado esquerdo: {final_score_left:.3f}")
-        print(f"  - Lado direito: {final_score_right:.3f}")
-        print(f"  - Diferença: {confidence:.3f}")
-        print(f"  - LADO MAIS VISÍVEL: {more_visible_side.upper()}")
-        print("=" * 40)
+        if verbose:
+            print(f"\nScores finais:")
+            print(f"  - Lado esquerdo: {final_score_left:.3f}")
+            print(f"  - Lado direito: {final_score_right:.3f}")
+            print(f"  - Diferença: {confidence:.3f}")
+            print(f"  - LADO MAIS VISÍVEL: {more_visible_side.upper()}")
+            print("=" * 40)
         
         return more_visible_side
     
-    def _fallback_side_detection(self, landmarks):
+    def _fallback_side_detection(self, landmarks, verbose=True):
         """
         Análise de fallback baseada apenas na presença dos landmarks.
         
         Args:
             landmarks (dict): Dicionário com as coordenadas dos landmarks
+            verbose (bool): Se True, imprime informações de debug
             
         Returns:
             str: 'left' ou 'right'
         """
-        print("Usando análise de fallback (sem dados de visibilidade)")
+        if verbose:
+            print("Usando análise de fallback (sem dados de visibilidade)")
         
         # Landmarks críticos para cada lado
         left_critical = [11, 13, 15]   # Ombro, cotovelo, pulso esquerdos
@@ -316,11 +346,12 @@ class PoseDetector:
         
         more_visible_side = 'left' if left_score >= right_score else 'right'
         
-        print(f"Landmarks críticos - Esquerda: {left_critical_count}/3, Direita: {right_critical_count}/3")
-        print(f"Landmarks adicionais - Esquerda: {left_additional_count}/5, Direita: {right_additional_count}/5")
-        print(f"Score total - Esquerda: {left_score}, Direita: {right_score}")
-        print(f"LADO MAIS VISÍVEL: {more_visible_side.upper()}")
-        print("=" * 40)
+        if verbose:
+            print(f"Landmarks críticos - Esquerda: {left_critical_count}/3, Direita: {right_critical_count}/3")
+            print(f"Landmarks adicionais - Esquerda: {left_additional_count}/5, Direita: {right_additional_count}/5")
+            print(f"Score total - Esquerda: {left_score}, Direita: {right_score}")
+            print(f"LADO MAIS VISÍVEL: {more_visible_side.upper()}")
+            print("=" * 40)
         
         return more_visible_side
         

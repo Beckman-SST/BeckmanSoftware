@@ -79,7 +79,7 @@ class PoseVisualizer:
             h, w, _ = frame.shape
             landmarks_dict = {}
             for i, landmark in enumerate(modified_landmarks.landmark):
-                if landmark.visibility >= 0.5:
+                if landmark.visibility >= 0.3:  # Threshold mais permissivo para mostrar mais landmarks
                     x = int(landmark.x * w)
                     y = int(landmark.y * h)
                     landmarks_dict[i] = (x, y)
@@ -109,7 +109,7 @@ class PoseVisualizer:
                 frame,
                 modified_landmarks,
                 None,  # Não usa as conexões padrão
-                landmark_drawing_spec=mpDraw.DrawingSpec(color=(245, 117, 66), thickness=4, circle_radius=4),
+                landmark_drawing_spec=mpDraw.DrawingSpec(color=(245, 117, 66), thickness=4, circle_radius=6),
                 connection_drawing_spec=None  # Não desenha conexões aqui
             )
             
@@ -126,13 +126,14 @@ class PoseVisualizer:
     
     def _filter_landmarks(self, landmarks, show_upper_body, show_lower_body, more_visible_side=None):
         """
-        Filtra os landmarks com base nas opções de visualização.
+        Filtra os landmarks com base nas opções de visualização usando threshold de visibilidade.
+        Agora usa um threshold mínimo de visibilidade em vez de ocultar completamente um lado.
         
         Args:
             landmarks: Landmarks do MediaPipe
             show_upper_body (bool): Se True, mostra os landmarks do corpo superior
             show_lower_body (bool): Se True, mostra os landmarks do corpo inferior
-            more_visible_side (str): Lado mais visível ('left' ou 'right'). Se None, será determinado localmente.
+            more_visible_side (str): Lado mais visível ('left' ou 'right'). Usado apenas para referência.
             
         Returns:
             Landmarks filtrados
@@ -150,50 +151,6 @@ class PoseVisualizer:
         right_lower_body_ids = [24, 26, 28, 32]  # Quadril, joelho, tornozelo e foot index direito
         left_lower_body_ids = [23, 25, 27, 31]   # Quadril, joelho, tornozelo e foot index esquerdo
         
-        # Usa o lado mais visível fornecido ou determina localmente se não fornecido
-        if more_visible_side is not None:
-            # Usa o lado mais visível já determinado globalmente
-            more_visible_side_upper = more_visible_side
-            more_visible_side_lower = more_visible_side
-        else:
-            # Determina qual lado é mais visível para o corpo superior (fallback)
-            right_upper_visibility = 0
-            left_upper_visibility = 0
-            
-            if show_upper_body:
-                # Calcula a visibilidade média dos landmarks do lado direito
-                for i in right_upper_body_ids:
-                    if i < len(modified_landmarks.landmark):
-                        right_upper_visibility += modified_landmarks.landmark[i].visibility
-                right_upper_visibility /= len(right_upper_body_ids)
-                
-                # Calcula a visibilidade média dos landmarks do lado esquerdo
-                for i in left_upper_body_ids:
-                    if i < len(modified_landmarks.landmark):
-                        left_upper_visibility += modified_landmarks.landmark[i].visibility
-                left_upper_visibility /= len(left_upper_body_ids)
-            
-            # Determina qual lado é mais visível para o corpo inferior (fallback)
-            right_lower_visibility = 0
-            left_lower_visibility = 0
-            
-            if show_lower_body:
-                # Calcula a visibilidade média dos landmarks do lado direito
-                for i in right_lower_body_ids:
-                    if i < len(modified_landmarks.landmark):
-                        right_lower_visibility += modified_landmarks.landmark[i].visibility
-                right_lower_visibility /= len(right_lower_body_ids)
-                
-                # Calcula a visibilidade média dos landmarks do lado esquerdo
-                for i in left_lower_body_ids:
-                    if i < len(modified_landmarks.landmark):
-                        left_lower_visibility += modified_landmarks.landmark[i].visibility
-                left_lower_visibility /= len(left_lower_body_ids)
-            
-            # Determina qual lado é mais visível no geral (fallback)
-            more_visible_side_upper = "right" if right_upper_visibility > left_upper_visibility else "left"
-            more_visible_side_lower = "right" if right_lower_visibility > left_lower_visibility else "left"
-        
         # Determina se a imagem é lateral (corpo superior) ou frontal (corpo inferior)
         # Verifica se os tornozelos e pés estão visíveis
         ankle_foot_ids = [27, 28, 31, 32]  # Tornozelos e pés
@@ -205,26 +162,47 @@ class PoseVisualizer:
         # Lista para armazenar os IDs dos landmarks a serem mantidos
         ids_to_keep = []
         
-        # Adiciona apenas o olho do lado mais visível
+        # Nova lógica: usa threshold de visibilidade mínima (0.3) em vez de ocultar completamente um lado
+        VISIBILITY_THRESHOLD = 0.3
+        
+        # Adiciona olhos com base na visibilidade
         if show_upper_body:
-            if more_visible_side_upper == "right":
-                ids_to_keep.append(5)  # RIGHT_EYE
-            else:
+            # Verifica visibilidade dos olhos
+            left_eye_visibility = modified_landmarks.landmark[2].visibility if 2 < len(modified_landmarks.landmark) else 0
+            right_eye_visibility = modified_landmarks.landmark[5].visibility if 5 < len(modified_landmarks.landmark) else 0
+            
+            if left_eye_visibility >= VISIBILITY_THRESHOLD:
                 ids_to_keep.append(2)  # LEFT_EYE
+            if right_eye_visibility >= VISIBILITY_THRESHOLD:
+                ids_to_keep.append(5)  # RIGHT_EYE
         
-        # Adiciona os IDs do corpo superior do lado mais visível se necessário
+        # Adiciona landmarks do corpo superior com base na visibilidade
         if show_upper_body:
-            if more_visible_side_upper == "right":
-                ids_to_keep.extend(right_upper_body_ids)
-            else:
-                ids_to_keep.extend(left_upper_body_ids)
+            # Verifica landmarks do lado esquerdo
+            for landmark_id in left_upper_body_ids:
+                if landmark_id < len(modified_landmarks.landmark):
+                    if modified_landmarks.landmark[landmark_id].visibility >= VISIBILITY_THRESHOLD:
+                        ids_to_keep.append(landmark_id)
+            
+            # Verifica landmarks do lado direito
+            for landmark_id in right_upper_body_ids:
+                if landmark_id < len(modified_landmarks.landmark):
+                    if modified_landmarks.landmark[landmark_id].visibility >= VISIBILITY_THRESHOLD:
+                        ids_to_keep.append(landmark_id)
         
-        # Adiciona os IDs do corpo inferior do lado mais visível apenas se não for vista lateral
+        # Adiciona landmarks do corpo inferior com base na visibilidade (apenas se não for vista lateral)
         if show_lower_body and not is_lateral_view:
-            if more_visible_side_lower == "right":
-                ids_to_keep.extend(right_lower_body_ids)
-            else:
-                ids_to_keep.extend(left_lower_body_ids)
+            # Verifica landmarks do lado esquerdo
+            for landmark_id in left_lower_body_ids:
+                if landmark_id < len(modified_landmarks.landmark):
+                    if modified_landmarks.landmark[landmark_id].visibility >= VISIBILITY_THRESHOLD:
+                        ids_to_keep.append(landmark_id)
+            
+            # Verifica landmarks do lado direito
+            for landmark_id in right_lower_body_ids:
+                if landmark_id < len(modified_landmarks.landmark):
+                    if modified_landmarks.landmark[landmark_id].visibility >= VISIBILITY_THRESHOLD:
+                        ids_to_keep.append(landmark_id)
         
         # Oculta todos os landmarks que não estão na lista de IDs a serem mantidos
         # e também oculta os pontos da mão, exceto o dedo médio que é usado para o cálculo do ângulo
@@ -273,7 +251,7 @@ class PoseVisualizer:
                 cv2.circle(
                     frame,
                     landmarks[start_id],
-                    thickness + 1,  # Raio um pouco maior que a espessura da linha
+                    thickness + 2,  # Raio aumentado para pontos maiores
                     (245, 117, 66),  # Cor laranja para os landmarks
                     -1  # Preenchido
                 )
@@ -281,7 +259,7 @@ class PoseVisualizer:
                 cv2.circle(
                     frame,
                     landmarks[end_id],
-                    thickness + 1,  # Raio um pouco maior que a espessura da linha
+                    thickness + 2,  # Raio aumentado para pontos maiores
                     (245, 117, 66),  # Cor laranja para os landmarks
                     -1  # Preenchido
                 )
@@ -342,7 +320,7 @@ class PoseVisualizer:
         
         # Padding aumentado para o fundo do texto (incluindo espaço para o símbolo)
         bg_padding = 8  # Aumentado de 5 para 8 pixels
-        symbol_space = 12  # Espaço extra para o símbolo de grau
+        symbol_space = 18  # Espaço extra aumentado para o símbolo de grau maior
         
         # Adiciona um fundo semi-transparente para destacar o texto
         # Coordenadas do retângulo (x1, y1) é o canto superior esquerdo e (x2, y2) é o canto inferior direito
@@ -381,13 +359,17 @@ class PoseVisualizer:
             thickness
         )
         
-        # Desenha o símbolo de grau manualmente (pequeno círculo)
-        symbol_x = adjusted_position[0] + text_w + 3  # 3 pixels de espaço após o texto
-        symbol_y = adjusted_position[1] - int(text_h * 0.7)  # Posição superior
-        symbol_radius = max(2, int(font_scale * 4))  # Raio proporcional à fonte
+        # Desenha o símbolo de grau manualmente (círculo maior e mais visível)
+        symbol_x = adjusted_position[0] + text_w + 5  # 5 pixels de espaço após o texto (aumentado)
+        symbol_y = adjusted_position[1] - int(text_h * 0.65)  # Posição superior ajustada
+        symbol_radius = max(4, int(font_scale * 6))  # Raio maior e mais proporcional à fonte
         
-        # Desenha o círculo do símbolo de grau
-        cv2.circle(frame, (symbol_x, symbol_y), symbol_radius, color, thickness//2 or 1)
+        # Desenha o círculo do símbolo de grau com espessura maior
+        cv2.circle(frame, (symbol_x, symbol_y), symbol_radius, color, max(2, thickness//2))
+        
+        # Adiciona um círculo interno menor para criar um efeito de anel mais visível
+        inner_radius = max(2, symbol_radius - 1)
+        cv2.circle(frame, (symbol_x, symbol_y), inner_radius, (0, 0, 0), 1)
         
         return frame
     

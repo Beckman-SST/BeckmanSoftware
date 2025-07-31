@@ -15,7 +15,30 @@ DEFAULT_CONFIG = {
     'show_lower_body': True,
     'processing_mode': 'auto',  # 'auto', 'upper_only', 'lower_only'
     'only_face_blur': False,  # Nova opção para processar apenas com tarja facial
-    'resize_width': 800
+    'resize_width': 800,
+    
+    # Configurações de pré-processamento de imagem
+    'enable_clahe': True,  # Habilita CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    'clahe_clip_limit': 2.0,  # Limite de contraste para CLAHE (1.0-4.0, padrão: 2.0)
+    'clahe_tile_grid_size': 8,  # Tamanho da grade de tiles para CLAHE (4-16, padrão: 8)
+    
+    # Configurações de Suavização Temporal Avançada
+    'enable_advanced_smoothing': True,  # Habilita suavização temporal avançada
+    'enable_kalman_filter': True,  # Habilita filtro de Kalman para landmarks
+    'enable_outlier_detection': True,  # Habilita detecção de outliers
+    'enable_weighted_average': True,  # Habilita média móvel ponderada
+    
+    # Parâmetros do Filtro de Kalman
+    'kalman_process_noise': 0.01,  # Ruído do processo (0.001-0.1, padrão: 0.01)
+    'kalman_measurement_noise': 0.1,  # Ruído da medição (0.01-1.0, padrão: 0.1)
+    
+    # Parâmetros da Detecção de Outliers
+    'outlier_velocity_threshold': 50.0,  # Threshold de velocidade para outliers (pixels/frame)
+    'outlier_acceleration_threshold': 100.0,  # Threshold de aceleração para outliers
+    
+    # Parâmetros da Média Móvel Ponderada
+    'weighted_window_size': 5,  # Tamanho da janela para média ponderada (3-10, padrão: 5)
+    'weighted_decay_factor': 0.8  # Fator de decaimento para pesos (0.5-0.95, padrão: 0.8)
 }
 
 class ConfigManager:

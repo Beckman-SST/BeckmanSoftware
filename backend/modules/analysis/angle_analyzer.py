@@ -8,7 +8,45 @@ class AngleAnalyzer:
         """
         pass
         
-    # A função calculate_neck_angle foi removida
+    def calculate_neck_angle(self, landmarks, face_center=None):
+        """
+        Calcula o ângulo do pescoço entre o ponto médio dos ombros e o centro da face/nariz.
+        
+        Args:
+            landmarks (dict): Dicionário com as coordenadas dos landmarks
+            face_center (tuple): Centro da tarja facial (x, y). Se None, usa o nariz.
+            
+        Returns:
+            float: Ângulo do pescoço em relação à vertical ou None se não for possível calcular
+        """
+        # IDs dos landmarks dos ombros
+        left_shoulder_id, right_shoulder_id = 11, 12
+        
+        # Verifica se os ombros estão disponíveis
+        if not all(lm_id in landmarks for lm_id in [left_shoulder_id, right_shoulder_id]):
+            return None
+        
+        # Calcula o ponto médio entre os ombros
+        left_shoulder = landmarks[left_shoulder_id]
+        right_shoulder = landmarks[right_shoulder_id]
+        shoulder_midpoint = (
+            (left_shoulder[0] + right_shoulder[0]) // 2,
+            (left_shoulder[1] + right_shoulder[1]) // 2
+        )
+        
+        # Determina o ponto da cabeça/pescoço
+        if face_center:
+            # Usa o centro da tarja facial se fornecido
+            head_point = face_center
+        else:
+            # Usa o nariz como fallback (ID 0 no MediaPipe)
+            nose_id = 0
+            if nose_id not in landmarks:
+                return None
+            head_point = landmarks[nose_id]
+        
+        # Calcula o ângulo em relação à vertical
+        return calculate_angle_with_vertical(head_point, shoulder_midpoint)
     
     def calculate_spine_angle(self, landmarks, use_vertical_reference=True):
         """
@@ -99,7 +137,6 @@ class AngleAnalyzer:
             
         Returns:
             float: Ângulo do antebraço ou None se não for possível calcular
-            int: Pontuação baseada no ângulo (1-2 pontos)
         """
         if side == 'right':
             # Ombro, cotovelo e pulso direitos
@@ -110,7 +147,7 @@ class AngleAnalyzer:
         
         # Verifica se todos os landmarks necessários estão disponíveis
         if not all(lm_id in landmarks for lm_id in [shoulder_id, elbow_id, wrist_id]):
-            return None, None
+            return None
         
         # Calcula o ângulo entre ombro, cotovelo e pulso
         forearm_angle = calculate_angle(
@@ -119,18 +156,7 @@ class AngleAnalyzer:
             landmarks[wrist_id]
         )
         
-        if forearm_angle is None:
-            return None, None
-        
-        # Determina a pontuação com base no ângulo
-        # 60° a 100° = 1 ponto (verde)
-        # Fora dessa faixa = 2 pontos (amarelo)
-        if 60 <= forearm_angle <= 100:
-            score = 1  # Verde (60° a 100°)
-        else:
-            score = 2  # Amarelo (fora da faixa)
-        
-        return forearm_angle, score
+        return forearm_angle
     
     def calculate_wrist_angle(self, landmarks, side='right'):
         """
@@ -171,7 +197,6 @@ class AngleAnalyzer:
             
         Returns:
             float: Ângulo do joelho ou None se não for possível calcular
-            int: Pontuação baseada no ângulo (1-3 pontos) segundo critérios de Suzanne Rodgers
         """
         if side == 'right':
             # Quadril, joelho e tornozelo direitos
@@ -182,7 +207,7 @@ class AngleAnalyzer:
         
         # Verifica se todos os landmarks necessários estão disponíveis
         if not all(lm_id in landmarks for lm_id in [hip_id, knee_id, ankle_id]):
-            return None, None
+            return None
         
         # Calcula o ângulo
         knee_angle = calculate_angle(
@@ -191,27 +216,7 @@ class AngleAnalyzer:
             landmarks[ankle_id]
         )
         
-        if knee_angle is None:
-            return None, None
-        
-        # Determina a pontuação com base no ângulo segundo critérios de Suzanne Rodgers
-        # Postura "Verde" (Baixo Esforço - Suzanne Rodgers Nível 1):
-        # Joelhos: Ângulo do joelho (quadril-joelho-tornozelo) entre 160° e 180° (quase reto, de pé ou sentado com pernas esticadas)
-        if 160 <= knee_angle <= 180:
-            score = 1  # Verde (160° a 180°)
-        # Postura "Amarela" (Moderado Esforço - Suzanne Rodgers Nível 2):
-        # Joelhos: Flexão Moderada: Joelho entre 45° e 80° (agachamento leve ou joelhos muito dobrados ao sentar)
-        elif 45 <= knee_angle <= 80:
-            score = 2  # Amarelo (45° a 80°)
-        # Postura "Vermelha" (Alto/Muito Alto Esforço - Suzanne Rodgers Nível 3+):
-        # Joelhos: Flexão profunda (joelho < 45°, indicando agachamento profundo)
-        elif knee_angle < 45:
-            score = 3  # Vermelho (<45°)
-        else:
-            # Outros ângulos (entre 80° e 160°) - consideramos como nível moderado
-            score = 2  # Amarelo (outros ângulos)
-        
-        return knee_angle, score
+        return knee_angle
     
     def calculate_ankle_angle(self, landmarks, side='right'):
         """
@@ -253,23 +258,17 @@ class AngleAnalyzer:
             
         Returns:
             float: Ângulo do ombro ou None se não for possível calcular
-            int: Pontuação baseada no ângulo (1-4 pontos)
-            bool: Indica se o braço está em abdução (para o lado)
         """
         if side == 'right':
             # Ombro e cotovelo direitos
             shoulder_id, elbow_id = 12, 14
-            # Ombro oposto para verificar abdução
-            opposite_shoulder_id = 11
         else:
             # Ombro e cotovelo esquerdos
             shoulder_id, elbow_id = 11, 13
-            # Ombro oposto para verificar abdução
-            opposite_shoulder_id = 12
         
         # Verifica se todos os landmarks necessários estão disponíveis
-        if not all(lm_id in landmarks for lm_id in [shoulder_id, elbow_id, opposite_shoulder_id]):
-            return None, None, False
+        if not all(lm_id in landmarks for lm_id in [shoulder_id, elbow_id]):
+            return None
         
         # Calcula o ângulo com a vertical
         shoulder_angle = calculate_angle_with_vertical(
@@ -277,40 +276,7 @@ class AngleAnalyzer:
             landmarks[elbow_id]
         )
         
-        if shoulder_angle is None:
-            return None, None, False
-        
-        # Determina a pontuação com base no ângulo
-        score = 1  # Valor padrão
-        
-        if shoulder_angle <= 20:
-            score = 1  # Verde (0° a 20°)
-        elif shoulder_angle <= 45:
-            score = 2  # Amarelo (>20° a 45°)
-        elif shoulder_angle <= 90:
-            score = 3  # Laranja (>45° a 90°)
-        else:
-            score = 4  # Vermelho (>90°)
-        
-        # Verifica se o braço está em abdução (para o lado)
-        # Calculamos a diferença horizontal entre o cotovelo e a linha vertical do ombro
-        is_abducted = False
-        
-        # Calcula a diferença horizontal entre os ombros
-        shoulder_x = landmarks[shoulder_id][0]
-        opposite_shoulder_x = landmarks[opposite_shoulder_id][0]
-        shoulder_distance = abs(shoulder_x - opposite_shoulder_x)
-        
-        # Calcula a diferença horizontal entre o ombro e o cotovelo
-        elbow_x = landmarks[elbow_id][0]
-        horizontal_diff = abs(elbow_x - shoulder_x)
-        
-        # Se a diferença horizontal for significativa em relação à distância entre os ombros,
-        # consideramos que o braço está em abdução
-        if horizontal_diff > (shoulder_distance * 0.4):
-            is_abducted = True
-        
-        return shoulder_angle, score, is_abducted
+        return shoulder_angle
     
     def calculate_eyes_to_device_angle(self, landmarks, device_center):
         """

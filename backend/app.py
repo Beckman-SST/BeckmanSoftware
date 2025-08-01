@@ -204,7 +204,7 @@ def processar_arquivos(file_paths, is_operacional=False):
     
     tempo_total = time.time() - tempo_inicio
     
-    # Se foi um processamento operacional, restaura a configuração para o valor padrão
+    # Se foi um desenho de tarjas, restaura a configuração para o valor padrão
     if is_operacional:
         config = load_config()
         config['only_face_blur'] = False
@@ -341,7 +341,7 @@ def upload_file():
         is_operacional = processing_type == 'operacional'
         is_videos = processing_type == 'videos'
         
-        # Se for processamento operacional, atualiza a configuração para usar apenas tarja facial
+        # Se for desenho de tarjas, atualiza a configuração para usar apenas tarja facial
         if is_operacional:
             config = load_config()
             config['only_face_blur'] = True
@@ -373,7 +373,7 @@ def upload_file():
             
             message = f'{len(valid_files)} arquivo(s) enviado(s) para processamento'
             if is_operacional:
-                message += ' operacional com tarja facial'
+                message += ' com desenho de tarjas'
             elif is_videos:
                 message += ' de vídeos'
             
@@ -726,7 +726,7 @@ def create_collages():
                 total_width += img.size[0]
 
             # Calcula dimensões para o texto
-            text_height = 60  # Altura reservada para o texto
+            text_height = 80  # Altura reservada para o texto (aumentada para fonte maior)
             final_height = max_height + text_height
 
             # Cria uma nova imagem com as dimensões corretas incluindo espaço para texto
@@ -741,29 +741,36 @@ def create_collages():
             # Adiciona o texto do nome do grupo
             draw = ImageDraw.Draw(result)
             
-            # Tenta usar uma fonte do sistema, senão usa a fonte padrão
+            # Converte o nome do grupo para caixa alta
+            group_name_upper = group_name.upper()
+            
+            # Tenta usar uma fonte do sistema em tamanho maior e negrito, senão usa a fonte padrão
             try:
-                # Tenta carregar uma fonte TrueType do sistema
-                font = ImageFont.truetype("arial.ttf", 36)
+                # Tenta carregar uma fonte TrueType do sistema em negrito e tamanho maior
+                font = ImageFont.truetype("arialbd.ttf", 48)  # Arial Bold, tamanho 48
             except:
                 try:
-                    # Fallback para fonte padrão do PIL
-                    font = ImageFont.load_default()
+                    # Fallback para Arial normal em tamanho maior
+                    font = ImageFont.truetype("arial.ttf", 48)
                 except:
-                    font = None
+                    try:
+                        # Fallback para fonte padrão do PIL
+                        font = ImageFont.load_default()
+                    except:
+                        font = None
             
             # Calcula posição centralizada do texto
             if font:
-                bbox = draw.textbbox((0, 0), group_name, font=font)
+                bbox = draw.textbbox((0, 0), group_name_upper, font=font)
                 text_width = bbox[2] - bbox[0]
             else:
-                text_width = len(group_name) * 10  # Estimativa aproximada
+                text_width = len(group_name_upper) * 12  # Estimativa aproximada para fonte maior
             
             text_x = (total_width - text_width) // 2
-            text_y = (text_height - 36) // 2  # Centraliza verticalmente no espaço reservado
+            text_y = (text_height - 48) // 2  # Centraliza verticalmente no espaço reservado para fonte maior
             
-            # Desenha o texto
-            draw.text((text_x, text_y), group_name, fill='black', font=font)
+            # Desenha o texto em caixa alta
+            draw.text((text_x, text_y), group_name_upper, fill='black', font=font)
 
             # Gera um nome único para a colagem
             timestamp = int(time.time())

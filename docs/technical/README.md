@@ -46,6 +46,32 @@ Documentação técnica completa sobre o sistema avançado de suavização tempo
 - Extensibilidade e desenvolvimento futuro
 - Resultados: 2.7% melhoria no jitter, 88% detecção de outliers
 
+### [Cache Inteligente](./cache_inteligente.md)
+
+Documentação técnica completa sobre o sistema de cache inteligente adaptativo, incluindo:
+
+- Arquitetura e múltiplas estratégias de cache (LRU, LFU, Adaptive, Temporal, Hybrid)
+- Cache hierárquico otimizado por região anatômica
+- Compressão/descompressão de dados e gerenciamento de memória
+- Thread safety e métricas de performance
+- 20+ métodos otimizados para evicção e análise de padrões
+- Configuração e integração com o sistema
+- Troubleshooting e monitoramento
+- Desenvolvimento futuro e extensibilidade
+
+### [Processamento Hierárquico](./processamento_hierarquico.md)
+
+Documentação técnica completa sobre o sistema de processamento hierárquico, incluindo:
+
+- Arquitetura com 4 níveis de prioridade (Critical, High, Medium, Low)
+- Processamento adaptativo com orçamento de tempo por nível
+- Cache inteligente por região e otimizações de memória
+- Verificação inteligente de tempo e lógica de skip
+- Integração otimizada entre níveis de processamento
+- Métricas de performance e análise de padrões
+- Configuração e estratégias de otimização
+- Monitoramento, debugging e troubleshooting
+
 ### [Implementação](./implementacao.md)
 
 Detalhes técnicos da implementação, incluindo:
@@ -124,3 +150,25 @@ O sistema implementa várias otimizações para melhorar o desempenho:
 ## Extensibilidade
 
 O sistema foi projetado para ser extensível, permitindo a adição de novos ângulos, critérios de avaliação e visualizações. Para detalhes sobre como estender o sistema, consulte o [guia de manutenção](../guias/manutencao.md).
+
+## Documentações Técnicas Disponíveis
+
+### Sistema de Cache Inteligente
+- **Arquivo**: [cache_inteligente.md](cache_inteligente.md)
+- **Descrição**: Documentação completa do sistema de cache inteligente implementado
+- **Conteúdo**: Arquitetura, estratégias de cache, otimizações, configuração e troubleshooting
+
+### Sistema de Processamento Hierárquico  
+- **Arquivo**: [processamento_hierarquico.md](processamento_hierarquico.md)
+- **Descrição**: Documentação do sistema de processamento hierárquico por níveis de prioridade
+- **Conteúdo**: Níveis de processamento, fluxo otimizado, métodos, configuração e performance
+
+### Otimizações de Performance
+- **Arquivo**: [otimizacoes_performance.md](otimizacoes_performance.md)
+- **Descrição**: Documentação detalhada de todas as otimizações de performance implementadas
+- **Conteúdo**: Métricas de ganho, algoritmos otimizados, benchmarks, configurações e troubleshooting
+
+### Arquitetura de Classes Otimizadas
+- **Arquivo**: [../arquitetura/classes_otimizadas.md](../arquitetura/classes_otimizadas.md)
+- **Descrição**: Documentação da arquitetura das classes otimizadas e seus relacionamentos
+- **Conteúdo**: Diagramas de classes, padrões de design, estruturas otimizadas e extensibilidade

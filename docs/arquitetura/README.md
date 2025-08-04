@@ -89,20 +89,45 @@ Responsável pelo processamento de vídeos. Este módulo coordena todo o fluxo d
 
 ### 5. Módulo Core (`core`)
 
-Contém funções e classes utilitárias usadas por outros módulos, como funções para cálculo de ângulos, conversão de coordenadas, etc.
+Contém funções e classes utilitárias usadas por outros módulos, incluindo sistemas avançados de otimização e cache.
+
+**Componentes:**
+- `IntelligentCache`: Sistema de cache adaptativo ultra-eficiente
+- `HierarchicalProcessor`: Processador hierárquico por prioridade anatômica
+- `EnhancedLandmarkProcessor`: Processador aprimorado de landmarks
+- `AdaptiveKalman`: Sistema de Kalman adaptativo
 
 **Responsabilidades:**
 - Fornecer funções matemáticas para cálculos
 - Implementar utilitários para manipulação de dados
 - Fornecer constantes e configurações compartilhadas
+- **Cache Inteligente**: Acelerar processamento com múltiplas estratégias de cache
+- **Processamento Hierárquico**: Otimizar performance por níveis de prioridade
+- **Suavização Avançada**: Filtro de Kalman e detecção de outliers
 
 ## Fluxo de Dados
 
+### Fluxo Tradicional
 1. **Entrada**: O vídeo é lido frame a frame pelo `VideoProcessor`.
 2. **Detecção**: Cada frame é processado pelo `PoseDetector` para detectar landmarks do corpo.
 3. **Análise**: Os landmarks detectados são analisados pelo `AngleAnalyzer` para calcular ângulos entre articulações.
 4. **Visualização**: Os resultados da análise são visualizados pelo `VideoVisualizer`, que desenha landmarks, conexões e ângulos no frame.
 5. **Saída**: O frame processado é escrito no vídeo de saída pelo `VideoProcessor`.
+
+### Fluxo Otimizado (com Cache Inteligente e Processamento Hierárquico)
+1. **Entrada**: O vídeo é lido frame a frame pelo `VideoProcessor`.
+2. **Cache Check**: O `IntelligentCache` verifica se o frame já foi processado.
+3. **Detecção**: Se não estiver em cache, o frame é processado pelo `PoseDetector`.
+4. **Processamento Hierárquico**: O `HierarchicalProcessor` processa landmarks por níveis de prioridade:
+   - **Nível 1 (Crítico)**: Face e pose central - sempre processado
+   - **Nível 2 (Alto)**: Mãos - alta prioridade
+   - **Nível 3 (Médio)**: Detalhes faciais - pode ser pulado
+   - **Nível 4 (Baixo)**: Auxiliares - primeiro a ser pulado
+5. **Suavização Avançada**: `EnhancedLandmarkProcessor` aplica filtro de Kalman e detecção de outliers.
+6. **Cache Store**: Resultados são armazenados no `IntelligentCache` para reutilização.
+7. **Análise**: Os landmarks otimizados são analisados pelo `AngleAnalyzer`.
+8. **Visualização**: Resultados visualizados pelo `VideoVisualizer`.
+9. **Saída**: Frame processado escrito no vídeo de saída.
 
 ## Interações entre Componentes
 
@@ -129,22 +154,31 @@ Contém funções e classes utilitárias usadas por outros módulos, como funç�
 
 ## Extensibilidade
 
-A arquitetura modular do sistema facilita a extensão e modificação de componentes individuais sem afetar o restante do sistema. Por exemplo:
+O sistema foi projetado com extensibilidade em mente:
 
-- Novos ângulos podem ser adicionados implementando novos métodos no `AngleAnalyzer` e `VideoVisualizer`.
-- Novos critérios de avaliação podem ser adicionados modificando os métodos de avaliação no `AngleAnalyzer`.
-- Novas visualizações podem ser adicionadas implementando novos métodos no `VideoVisualizer`.
-- Novos algoritmos de detecção podem ser adicionados implementando novas classes no módulo `detection`.
+- **Novos Detectores**: Fácil integração de novos modelos de detecção
+- **Algoritmos Personalizados**: Interface para algoritmos de análise customizados  
+- **Visualizações**: Sistema de plugins para novas formas de visualização
+- **Exportação**: Suporte a novos formatos de saída
 
 ## Configuração
 
-O sistema é altamente configurável, permitindo ajustar parâmetros como:
+O sistema permite configuração através de:
 
-- Resolução de processamento
-- Confiança mínima para detecção e rastreamento
-- Tamanho da janela para suavização de landmarks
-- Quais partes do corpo mostrar (superior/inferior)
-- Se aplicar tarja no rosto para privacidade
-- Modo de processamento (sequencial/paralelo)
+- **Arquivos de Configuração**: JSON/YAML para parâmetros do sistema
+- **Interface Gráfica**: Configuração interativa de parâmetros
+- **Linha de Comando**: Argumentos para execução automatizada
+- **Variáveis de Ambiente**: Configuração de ambiente de produção
 
-Estas configurações são definidas no construtor da classe `VideoProcessor` e podem ser personalizadas para cada instância do processador.
+## Documentação Adicional
+
+### Arquitetura de Classes Otimizadas
+- **Arquivo**: [classes_otimizadas.md](classes_otimizadas.md)
+- **Descrição**: Documentação detalhada da arquitetura das classes otimizadas implementadas
+- **Conteúdo**: 
+  - Diagramas de classes e relacionamentos
+  - Padrões de design utilizados (Strategy, Observer, Template Method, etc.)
+  - Estruturas de dados otimizadas
+  - Algoritmos de otimização implementados
+  - Extensibilidade e plugin system
+  - Testes e validação

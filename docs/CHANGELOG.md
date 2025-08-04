@@ -8,6 +8,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ## [Não Lançado]
 
 ### Adicionado
+- **Sistema de Cache Inteligente (IntelligentCache)**: Implementado sistema de cache adaptativo ultra-eficiente para acelerar processamento de landmarks, incluindo:
+  - Múltiplas estratégias de cache: LRU, LFU, Adaptive, Temporal e Hybrid
+  - Cache hierárquico otimizado por região anatômica (face, pose, mãos, pés)
+  - Adaptação automática baseada em padrões de uso
+  - Compressão/descompressão de dados otimizada
+  - Gerenciamento inteligente de memória com buffers reutilizáveis
+  - Thread safety com RLock otimizado
+  - Métricas de performance e estatísticas detalhadas
+  - 20+ métodos otimizados para evicção, análise de padrões e cache por região
+- **Processamento Hierárquico (HierarchicalProcessor)**: Implementado processador hierárquico que maximiza performance processando landmarks por ordem de prioridade, incluindo:
+  - 4 níveis de prioridade: Critical (face/pose), High (mãos), Medium (detalhes faciais), Low (auxiliares)
+  - Processamento adaptativo com orçamento de tempo por nível
+  - Cache inteligente por região com otimizações de memória
+  - Verificação inteligente de tempo e lógica otimizada de skip
+  - Integração otimizada entre níveis de processamento
+  - Métricas de performance e análise de padrões de acesso
+  - Processamento paralelo para níveis compatíveis
 - **Documentação de Suavização Temporal Avançada**: Criada documentação técnica completa para o sistema avançado de suavização temporal, incluindo:
   - Arquitetura detalhada dos componentes (Filtro de Kalman, Detecção de Outliers, Média Móvel Ponderada)
   - Algoritmos matemáticos e implementação técnica
@@ -41,7 +58,21 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Melhoria de performance: Evita recálculo desnecessário do lado mais visível
   - Melhoria de consistência: Garante que o mesmo lado mais visível seja usado em todo o pipeline de processamento
 
+### Documentação
+- **Documentação Técnica Completa**: Criação de documentação abrangente para todas as otimizações
+  - `docs/technical/cache_inteligente.md`: Sistema de Cache Inteligente
+  - `docs/technical/processamento_hierarquico.md`: Sistema de Processamento Hierárquico  
+  - `docs/technical/otimizacoes_performance.md`: Documentação detalhada de otimizações
+  - `docs/arquitetura/classes_otimizadas.md`: Arquitetura das classes otimizadas
+  - `docs/guias/desenvolvimento_otimizacoes.md`: Guia completo para desenvolvedores
+- **Atualização de READMEs**: Integração das novas documentações nos índices existentes
+- **CHANGELOG Atualizado**: Registro completo de todas as modificações implementadas
+
 ### Corrigido
+- **Estrutura de Classes e Duplicações**: Corrigida estrutura do arquivo `intelligent_cache.py` removendo métodos duplicados e garantindo aninhamento correto dentro da classe
+  - Removido bloco duplicado de 20+ métodos otimizados que estavam fora da classe `IntelligentCache`
+  - Corrigida indentação e estrutura de todos os métodos otimizados
+  - Verificada sintaxe dos arquivos `intelligent_cache.py` e `hierarchical_processor.py`
 - **Correção da detecção dos ângulos dos olhos**: Corrigida a lógica invertida na determinação dos vértices da caixa do dispositivo eletrônico
   - Modificado `image_processor.py`: Corrigida a lógica para lado esquerdo usar vértices superior esquerdo e inferior direito
   - Modificado `image_processor.py`: Corrigida a lógica para lado direito usar vértices superior direito e inferior esquerdo

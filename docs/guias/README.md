@@ -26,6 +26,18 @@ Guia detalhado para manutenção do sistema, incluindo:
 - Testes e validação
 - Boas práticas de codificação
 
+### [Guia de Desenvolvimento - Otimizações](./desenvolvimento_otimizacoes.md)
+
+Guia completo para desenvolvedores trabalhando com as otimizações implementadas:
+
+- **Estrutura do Código Otimizado**: Localização e organização dos arquivos
+- **IntelligentCache**: Como adicionar estratégias, debugging e configuração
+- **HierarchicalProcessor**: Criação de níveis customizados e monitoramento
+- **AdaptiveKalman**: Configuração personalizada e filtros customizados
+- **Otimizações de Performance**: Profiling, benchmarking e otimizações de memória
+- **Testes e Validação**: Testes unitários, integração e debugging
+- **Melhores Práticas**: Configuração para produção e monitoramento contínuo
+
 ## Guia de Uso
 
 ### Instalação

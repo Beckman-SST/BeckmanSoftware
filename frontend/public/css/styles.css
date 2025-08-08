@@ -23,7 +23,9 @@
 .sidebar-header h4 {
     margin: 0;
     font-weight: 600;
-    font-size: 1.5rem;
+    font-size: 1.1rem;
+    word-wrap: break-word;
+    line-height: 1.2;
 }
 
 .sidebar-header .logo-icon {
